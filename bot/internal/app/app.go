@@ -81,13 +81,38 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		return nil
 	}
 
-	switch normalizeCommand(text) {
+	cmd := normalizeCommand(text)
+	a.maybeDeleteCommandMessage(ctx, msg, cmd)
+
+	switch cmd {
 	case "/start":
 		return commands.HandleStart(ctx, a.deps(), msg)
 	case "/batch":
 		return commands.HandleBatch(ctx, a.deps(), msg)
 	default:
 		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch")
+	}
+}
+
+func (a *App) maybeDeleteCommandMessage(ctx context.Context, msg telegram.Message, cmd string) {
+	if !shouldDeleteUserCommand(cmd) {
+		return
+	}
+	if msg.MessageID <= 0 {
+		return
+	}
+
+	if err := a.tg.DeleteMessage(ctx, msg.Chat.ID, msg.MessageID); err != nil {
+		a.log.Printf("deleteMessage warning: %v", err)
+	}
+}
+
+func shouldDeleteUserCommand(cmd string) bool {
+	switch cmd {
+	case "/start", "/batch":
+		return true
+	default:
+		return false
 	}
 }
 

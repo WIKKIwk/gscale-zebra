@@ -35,9 +35,10 @@ type Update struct {
 }
 
 type Message struct {
-	Text string `json:"text"`
-	Chat Chat   `json:"chat"`
-	From User   `json:"from"`
+	MessageID int64  `json:"message_id"`
+	Text      string `json:"text"`
+	Chat      Chat   `json:"chat"`
+	From      User   `json:"from"`
 }
 
 type InlineQuery struct {
@@ -133,6 +134,17 @@ func (c *Client) SendMessageWithInlineKeyboard(ctx context.Context, chatID int64
 		form.Set("reply_markup", string(b))
 	}
 	return c.callAPI(ctx, "sendMessage", form)
+}
+
+func (c *Client) DeleteMessage(ctx context.Context, chatID, messageID int64) error {
+	if messageID <= 0 {
+		return nil
+	}
+
+	form := url.Values{}
+	form.Set("chat_id", strconv.FormatInt(chatID, 10))
+	form.Set("message_id", strconv.FormatInt(messageID, 10))
+	return c.callAPI(ctx, "deleteMessage", form)
 }
 
 func (c *Client) AnswerInlineQuery(ctx context.Context, inlineQueryID string, results []InlineQueryResultArticle, cacheSeconds int) error {
