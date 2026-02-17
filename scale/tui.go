@@ -3,131 +3,117 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
-	"golang.org/x/term"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
+type readingMsg struct {
+	reading Reading
+}
+
+type quitMsg struct{}
+
+type clockMsg time.Time
+
+type tuiModel struct {
+	ctx        context.Context
+	updates    <-chan Reading
+	sourceLine string
+	message    string
+	last       Reading
+	width      int
+	height     int
+}
+
 func runTUI(ctx context.Context, updates <-chan Reading, sourceLine string, serialErr error) error {
-	stdinFD := int(os.Stdin.Fd())
-	isTTY := term.IsTerminal(stdinFD)
-	var restore func() error
-	if isTTY {
-		oldState, err := term.MakeRaw(stdinFD)
-		if err == nil {
-			restore = func() error { return term.Restore(stdinFD, oldState) }
-		}
-		fmt.Print("\033[H\033[2J\033[?25l")
+	m := tuiModel{
+		ctx:        ctx,
+		updates:    updates,
+		sourceLine: sourceLine,
+		last:       Reading{Unit: "kg"},
+		message:    "scale oqimi kutilmoqda",
 	}
-
-	defer func() {
-		if restore != nil {
-			_ = restore()
-		}
-		if isTTY {
-			fmt.Print("\033[?25h")
-		}
-		fmt.Print("\n")
-	}()
-
-	quit := make(chan struct{}, 1)
-	if isTTY {
-		go readKeys(quit)
-	}
-
-	ticker := time.NewTicker(200 * time.Millisecond)
-	defer ticker.Stop()
-
-	var last Reading
-	last.Unit = "kg"
-	message := "scale oqimi kutilmoqda"
 	if serialErr != nil {
-		message = serialErr.Error()
+		m.message = serialErr.Error()
 	}
 
-	dirty := true
-	lastRender := time.Time{}
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	_, err := p.Run()
+	return err
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-quit:
-			return nil
-		case upd := <-updates:
-			if upd.Unit == "" && last.Unit != "" {
-				upd.Unit = last.Unit
-			}
-			last = upd
-			if upd.Error != "" {
-				message = upd.Error
-			} else {
-				message = "ok"
-			}
-			dirty = true
-		case <-ticker.C:
-			now := time.Now()
-			if dirty || now.Sub(lastRender) >= time.Second {
-				render(sourceLine, message, last)
-				lastRender = now
-				dirty = false
-			}
+func (m tuiModel) Init() tea.Cmd {
+	return tea.Batch(waitForReadingCmd(m.ctx, m.updates), clockTickCmd())
+}
+
+func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+	case tea.KeyMsg:
+		s := strings.ToLower(strings.TrimSpace(msg.String()))
+		if s == "q" || s == "ctrl+c" {
+			return m, tea.Quit
 		}
+		return m, nil
+	case readingMsg:
+		upd := msg.reading
+		if upd.Unit == "" && m.last.Unit != "" {
+			upd.Unit = m.last.Unit
+		}
+		m.last = upd
+		if upd.Error != "" {
+			m.message = upd.Error
+		} else {
+			m.message = "ok"
+		}
+		return m, waitForReadingCmd(m.ctx, m.updates)
+	case quitMsg:
+		return m, tea.Quit
+	case clockMsg:
+		return m, clockTickCmd()
+	default:
+		return m, nil
 	}
 }
 
-func readKeys(quit chan<- struct{}) {
-	buf := make([]byte, 1)
-	for {
-		n, err := os.Stdin.Read(buf)
-		if err != nil || n == 0 {
-			continue
-		}
-		if buf[0] == 'q' || buf[0] == 'Q' || buf[0] == 3 {
-			select {
-			case quit <- struct{}{}:
-			default:
-			}
-			return
-		}
-	}
-}
-
-func render(source, message string, r Reading) {
-	width, height := frameSize()
-	unit := strings.TrimSpace(r.Unit)
+func (m tuiModel) View() string {
+	width, height := viewSize(m.width, m.height)
+	unit := strings.TrimSpace(m.last.Unit)
 	if unit == "" {
 		unit = "kg"
 	}
 
 	qty := "-- " + unit
-	if r.Weight != nil {
-		qty = fmt.Sprintf("%.3f %s", *r.Weight, unit)
+	if m.last.Weight != nil {
+		qty = fmt.Sprintf("%.3f %s", *m.last.Weight, unit)
 	}
 
 	port := "-"
-	if strings.TrimSpace(r.Port) != "" {
-		port = strings.TrimSpace(r.Port)
+	if strings.TrimSpace(m.last.Port) != "" {
+		port = strings.TrimSpace(m.last.Port)
 	}
 
 	baud := "-"
-	if r.Baud > 0 {
-		baud = fmt.Sprintf("%d", r.Baud)
+	if m.last.Baud > 0 {
+		baud = fmt.Sprintf("%d", m.last.Baud)
 	}
 
 	updatedAt := "-"
-	if !r.UpdatedAt.IsZero() {
-		updatedAt = r.UpdatedAt.Format("2006-01-02 15:04:05")
+	if !m.last.UpdatedAt.IsZero() {
+		updatedAt = m.last.UpdatedAt.Format("2006-01-02 15:04:05")
 	}
 
-	status := strings.TrimSpace(message)
+	status := strings.TrimSpace(m.message)
 	if status == "" {
 		status = "ok"
 	}
 
-	raw := strings.TrimSpace(sanitizeInline(r.Raw, 700))
+	raw := strings.TrimSpace(sanitizeInline(m.last.Raw, 700))
 	if raw == "" {
 		raw = "(empty)"
 	}
@@ -146,13 +132,13 @@ func render(source, message string, r Reading) {
 		"Chiqish: Q tugmasi yoki Ctrl+C",
 	})
 	appendBox("Connection", []string{
-		"Source : " + source,
+		"Source : " + m.sourceLine,
 		"Port   : " + port,
 		"Baud   : " + baud,
 	})
 	appendBox("Reading", []string{
 		"QTY    : " + qty,
-		"Stable : " + stableText(r.Stable),
+		"Stable : " + stableText(m.last.Stable),
 		"Update : " + updatedAt,
 	})
 	appendBox("Status", []string{
@@ -176,9 +162,63 @@ func render(source, message string, r Reading) {
 	if len(frame) > height {
 		frame = frame[:height]
 	}
+	return strings.Join(frame, "\n")
+}
 
-	fmt.Print("\033[H\033[2J")
-	fmt.Print(strings.Join(frame, "\n"))
+func waitForReadingCmd(ctx context.Context, updates <-chan Reading) tea.Cmd {
+	return func() tea.Msg {
+		select {
+		case <-ctx.Done():
+			return quitMsg{}
+		case upd, ok := <-updates:
+			if !ok {
+				return quitMsg{}
+			}
+			return readingMsg{reading: upd}
+		}
+	}
+}
+
+func clockTickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return clockMsg(t)
+	})
+}
+
+func classifyStatus(status string) string {
+	v := strings.ToLower(status)
+	switch {
+	case v == "ok":
+		return "OK"
+	case strings.Contains(v, "busy") || strings.Contains(v, "timeout"):
+		return "WARN"
+	default:
+		return "ERROR"
+	}
+}
+
+func viewSize(w, h int) (int, int) {
+	if w <= 0 {
+		w = 92
+	}
+	if h <= 0 {
+		h = 28
+	}
+
+	width := 76
+	if w-4 < width {
+		width = w - 4
+	}
+	if width < 24 {
+		width = 24
+	}
+
+	height := h - 1
+	if height < 10 {
+		height = 10
+	}
+
+	return width, height
 }
 
 func drawBoxLines(title string, lines []string, width int) []string {
@@ -209,42 +249,6 @@ func drawBoxLines(title string, lines []string, width int) []string {
 
 	out = append(out, border)
 	return out
-}
-
-func classifyStatus(status string) string {
-	v := strings.ToLower(status)
-	switch {
-	case v == "ok":
-		return "OK"
-	case strings.Contains(v, "busy") || strings.Contains(v, "timeout"):
-		return "WARN"
-	default:
-		return "ERROR"
-	}
-}
-
-func frameSize() (int, int) {
-	w, h, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil || w <= 0 {
-		w = 92
-	}
-	if err != nil || h <= 0 {
-		h = 28
-	}
-
-	width := 76
-	if w-4 < width {
-		width = w - 4
-	}
-	if width < 24 {
-		width = 24
-	}
-
-	height := h - 1
-	if height < 10 {
-		height = 10
-	}
-	return width, height
 }
 
 func wrapByWidth(text string, width int) []string {
