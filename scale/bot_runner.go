@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -22,6 +24,10 @@ func startBotProcess(botDir string) (*BotProcess, error) {
 		return nil, err
 	}
 
+	if err := stopExistingBotProcesses(dir); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: old bot process cleanup xato: %v\n", err)
+	}
+
 	cmd := exec.Command("go", "run", "./cmd/bot")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -36,6 +42,16 @@ func startBotProcess(botDir string) (*BotProcess, error) {
 	go func() {
 		bp.done <- cmd.Wait()
 	}()
+
+	select {
+	case err := <-bp.done:
+		if err == nil {
+			return nil, errors.New("bot kutilmaganda tez yopildi")
+		}
+		return nil, fmt.Errorf("bot start xato: %w", err)
+	case <-time.After(450 * time.Millisecond):
+	}
+
 	return bp, nil
 }
 
@@ -103,4 +119,100 @@ func resolveBotDir(botDir string) (string, error) {
 	}
 
 	return "", errors.New("bot papkasi topilmadi (cmd/bot/main.go yo'q)")
+}
+
+func stopExistingBotProcesses(botDir string) error {
+	pids, err := findBotProcessPIDs(botDir)
+	if err != nil {
+		return err
+	}
+	if len(pids) == 0 {
+		return nil
+	}
+
+	for _, pid := range pids {
+		_ = syscall.Kill(pid, syscall.SIGTERM)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	alive := append([]int(nil), pids...)
+	for len(alive) > 0 && time.Now().Before(deadline) {
+		next := alive[:0]
+		for _, pid := range alive {
+			if isProcessAlive(pid) {
+				next = append(next, pid)
+			}
+		}
+		alive = next
+		if len(alive) > 0 {
+			time.Sleep(120 * time.Millisecond)
+		}
+	}
+
+	for _, pid := range alive {
+		_ = syscall.Kill(pid, syscall.SIGKILL)
+	}
+	return nil
+}
+
+func findBotProcessPIDs(botDir string) ([]int, error) {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return nil, nil
+	}
+
+	wantDir := filepath.Clean(botDir)
+	self := os.Getpid()
+	pids := make([]int, 0, 4)
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		pid, err := strconv.Atoi(e.Name())
+		if err != nil || pid <= 1 || pid == self {
+			continue
+		}
+
+		cwd, err := os.Readlink(filepath.Join("/proc", e.Name(), "cwd"))
+		if err != nil || filepath.Clean(cwd) != wantDir {
+			continue
+		}
+
+		b, err := os.ReadFile(filepath.Join("/proc", e.Name(), "cmdline"))
+		if err != nil {
+			continue
+		}
+		cmdline := strings.TrimSpace(strings.ReplaceAll(string(b), "\x00", " "))
+		if !isBotProcessCmdline(cmdline) {
+			continue
+		}
+
+		pids = append(pids, pid)
+	}
+
+	sort.Ints(pids)
+	return pids, nil
+}
+
+func isBotProcessCmdline(cmdline string) bool {
+	c := strings.ToLower(strings.TrimSpace(cmdline))
+	if c == "" {
+		return false
+	}
+	if strings.Contains(c, "go run ./cmd/bot") {
+		return true
+	}
+	if strings.Contains(c, "/.cache/go-build/") && strings.HasSuffix(c, "/bot") {
+		return true
+	}
+	return false
+}
+
+func isProcessAlive(pid int) bool {
+	err := syscall.Kill(pid, 0)
+	if err == nil {
+		return true
+	}
+	return errors.Is(err, syscall.EPERM)
 }
