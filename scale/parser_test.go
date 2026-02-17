@@ -12,6 +12,7 @@ func TestParseWeightNegativeFormats(t *testing.T) {
 		{name: "minus-spaced", raw: "ST, - 13 kg", want: -13},
 		{name: "minus-suffix", raw: "ST, 13 kg-", want: -13},
 		{name: "unicode-minus", raw: "ST, −13.5kg", want: -13.5},
+		{name: "n-prefix", raw: "ST, N13.25kg", want: -13.25},
 	}
 
 	for _, tc := range tests {
@@ -30,14 +31,28 @@ func TestParseWeightNegativeFormats(t *testing.T) {
 	}
 }
 
-func TestParseWeightPrefersMatchWithUnit(t *testing.T) {
-	raw := "x=123 ST - 13 kg"
+func TestParseWeightPrefersNegativeWhenFrameContainsBothSigns(t *testing.T) {
+	raw := "x=13kg net=-13kg ST"
 	w, unit, _, ok := parseWeight(raw, "kg")
 	if !ok {
 		t.Fatalf("parseWeight returned ok=false")
 	}
 	if w != -13 {
 		t.Fatalf("weight mismatch: got=%v want=%v", w, -13)
+	}
+	if unit != "kg" {
+		t.Fatalf("unit mismatch: got=%q want=%q", unit, "kg")
+	}
+}
+
+func TestParseWeightPositiveStillWorks(t *testing.T) {
+	raw := "ST, +13.40kg"
+	w, unit, _, ok := parseWeight(raw, "kg")
+	if !ok {
+		t.Fatalf("parseWeight returned ok=false")
+	}
+	if w != 13.4 {
+		t.Fatalf("weight mismatch: got=%v want=%v", w, 13.4)
 	}
 	if unit != "kg" {
 		t.Fatalf("unit mismatch: got=%q want=%q", unit, "kg")
