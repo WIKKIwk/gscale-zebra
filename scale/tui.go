@@ -19,21 +19,25 @@ func runTUI(ctx context.Context, updates <-chan Reading, sourceLine string, seri
 		if err == nil {
 			restore = func() error { return term.Restore(stdinFD, oldState) }
 		}
+		fmt.Print("\033[?1049h\033[H\033[2J\033[?25l")
 	}
 
-	if restore != nil {
-		defer func() {
+	defer func() {
+		if restore != nil {
 			_ = restore()
-			fmt.Print("\n")
-		}()
-	}
+		}
+		if isTTY {
+			fmt.Print("\033[?25h\033[?1049l")
+		}
+		fmt.Print("\n")
+	}()
 
 	quit := make(chan struct{}, 1)
 	if isTTY {
 		go readKeys(quit)
 	}
 
-	ticker := time.NewTicker(120 * time.Millisecond)
+	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
 	var last Reading
@@ -42,6 +46,9 @@ func runTUI(ctx context.Context, updates <-chan Reading, sourceLine string, seri
 	if serialErr != nil {
 		message = serialErr.Error()
 	}
+
+	dirty := true
+	lastRender := time.Time{}
 
 	for {
 		select {
@@ -59,8 +66,14 @@ func runTUI(ctx context.Context, updates <-chan Reading, sourceLine string, seri
 			} else {
 				message = "ok"
 			}
+			dirty = true
 		case <-ticker.C:
-			render(sourceLine, message, last)
+			now := time.Now()
+			if dirty || now.Sub(lastRender) >= time.Second {
+				render(sourceLine, message, last)
+				lastRender = now
+				dirty = false
+			}
 		}
 	}
 }
@@ -83,7 +96,7 @@ func readKeys(quit chan<- struct{}) {
 }
 
 func render(source, message string, r Reading) {
-	width := terminalWidth()
+	width, height := frameSize()
 	unit := strings.TrimSpace(r.Unit)
 	if unit == "" {
 		unit = "kg"
@@ -119,48 +132,69 @@ func render(source, message string, r Reading) {
 		raw = "(empty)"
 	}
 	rawLines := wrapByWidth(raw, width-4)
-	if len(rawLines) > 5 {
-		rawLines = rawLines[len(rawLines)-5:]
+
+	maxRaw := 5
+	frame := make([]string, 0, 64)
+	appendBox := func(title string, lines []string) {
+		if len(frame) > 0 {
+			frame = append(frame, "")
+		}
+		frame = append(frame, drawBoxLines(title, lines, width)...)
 	}
 
-	fmt.Print("\033[2J\033[H")
-	fmt.Println(drawBox("GSCALE ZEBRA MONITOR", []string{
+	appendBox("GSCALE ZEBRA MONITOR", []string{
 		"Chiqish: Q tugmasi yoki Ctrl+C",
-	}, width))
-	fmt.Println()
-	fmt.Println(drawBox("Connection", []string{
+	})
+	appendBox("Connection", []string{
 		"Source : " + source,
 		"Port   : " + port,
 		"Baud   : " + baud,
-	}, width))
-	fmt.Println()
-	fmt.Println(drawBox("Reading", []string{
+	})
+	appendBox("Reading", []string{
 		"QTY    : " + qty,
 		"Stable : " + stableText(r.Stable),
 		"Update : " + updatedAt,
-	}, width))
-	fmt.Println()
-	fmt.Println(drawBox("Status", []string{
+	})
+	appendBox("Status", []string{
 		"State  : " + classifyStatus(status),
 		"Detail : " + status,
-	}, width))
-	fmt.Println()
-	fmt.Println(drawBox("Raw Stream", rawLines, width))
+	})
+
+	baseRows := len(frame) + 1 + 4
+	available := height - baseRows
+	if available < 1 {
+		available = 1
+	}
+	if available < maxRaw {
+		maxRaw = available
+	}
+	if len(rawLines) > maxRaw {
+		rawLines = rawLines[len(rawLines)-maxRaw:]
+	}
+	appendBox("Raw Stream", rawLines)
+
+	if len(frame) > height {
+		frame = frame[:height]
+	}
+
+	fmt.Print("\033[H\033[2J")
+	fmt.Print(strings.Join(frame, "\n"))
 }
 
-func drawBox(title string, lines []string, width int) string {
-	if width < 60 {
-		width = 60
+func drawBoxLines(title string, lines []string, width int) []string {
+	if width < 24 {
+		width = 24
 	}
 	inner := width - 4
 	if inner < 1 {
 		inner = 1
 	}
 
-	var b strings.Builder
-	b.WriteString("+" + strings.Repeat("-", width-2) + "+\n")
-	b.WriteString("| " + padRight(truncateText(title, inner), inner) + " |\n")
-	b.WriteString("+" + strings.Repeat("-", width-2) + "+\n")
+	out := make([]string, 0, 16)
+	border := "+" + strings.Repeat("-", width-2) + "+"
+	out = append(out, border)
+	out = append(out, "| "+padRight(truncateText(title, inner), inner)+" |")
+	out = append(out, border)
 
 	if len(lines) == 0 {
 		lines = []string{""}
@@ -169,12 +203,12 @@ func drawBox(title string, lines []string, width int) string {
 	for _, line := range lines {
 		wrapped := wrapByWidth(line, inner)
 		for _, part := range wrapped {
-			b.WriteString("| " + padRight(truncateText(part, inner), inner) + " |\n")
+			out = append(out, "| "+padRight(truncateText(part, inner), inner)+" |")
 		}
 	}
 
-	b.WriteString("+" + strings.Repeat("-", width-2) + "+")
-	return b.String()
+	out = append(out, border)
+	return out
 }
 
 func classifyStatus(status string) string {
@@ -189,54 +223,73 @@ func classifyStatus(status string) string {
 	}
 }
 
-func terminalWidth() int {
-	w, _, err := term.GetSize(int(os.Stdout.Fd()))
+func frameSize() (int, int) {
+	w, h, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || w <= 0 {
-		return 92
+		w = 92
 	}
-	if w < 70 {
-		return 70
+	if err != nil || h <= 0 {
+		h = 28
 	}
-	if w > 140 {
-		return 140
+
+	width := w - 2
+	if width > 110 {
+		width = 110
 	}
-	return w
+	if width < 24 {
+		width = w - 1
+	}
+	if width < 24 {
+		width = 24
+	}
+
+	height := h - 1
+	if height < 10 {
+		height = 10
+	}
+	return width, height
 }
 
 func wrapByWidth(text string, width int) []string {
 	if width <= 0 {
-		return []string{text}
+		return []string{""}
 	}
 	if text == "" {
 		return []string{""}
 	}
 
-	lines := make([]string, 0, 4)
+	lines := make([]string, 0, 8)
 	for _, row := range strings.Split(text, "\n") {
-		remaining := row
-		for len(remaining) > width {
-			lines = append(lines, remaining[:width])
-			remaining = remaining[width:]
+		runes := []rune(row)
+		if len(runes) == 0 {
+			lines = append(lines, "")
+			continue
 		}
-		lines = append(lines, remaining)
+		for len(runes) > width {
+			lines = append(lines, string(runes[:width]))
+			runes = runes[width:]
+		}
+		lines = append(lines, string(runes))
 	}
 
 	return lines
 }
 
 func truncateText(text string, max int) string {
-	if len(text) <= max {
+	runes := []rune(text)
+	if len(runes) <= max {
 		return text
 	}
 	if max <= 3 {
-		return text[:max]
+		return string(runes[:max])
 	}
-	return text[:max-3] + "..."
+	return string(runes[:max-3]) + "..."
 }
 
 func padRight(text string, width int) string {
-	if len(text) >= width {
+	length := len([]rune(text))
+	if length >= width {
 		return text
 	}
-	return text + strings.Repeat(" ", width-len(text))
+	return text + strings.Repeat(" ", width-length)
 }
