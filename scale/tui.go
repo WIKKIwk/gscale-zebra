@@ -8,7 +8,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type readingMsg struct {
@@ -48,7 +47,7 @@ func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan Zeb
 		zebraPreferred: zebraPreferred,
 		last:           Reading{Unit: "kg"},
 		message:        "scale oqimi kutilmoqda",
-		info:           "keys: q quit | e encode+print epc | r read epc",
+		info:           "ready",
 		now:            time.Now(),
 		history:        make([]float64, 0, 256),
 		zebra: ZebraStatus{
@@ -95,14 +94,14 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.info = "zebra monitor o'chirilgan (--no-zebra)"
 				return m, nil
 			}
-			m.info = "epc encode+print yuborilmoqda (1 label/tag)..."
+			m.info = "encode+print yuborildi"
 			return m, runEncodeEPCCmd(m.zebraPreferred)
 		case "r":
 			if m.zebraUpdates == nil {
 				m.info = "zebra monitor o'chirilgan (--no-zebra)"
 				return m, nil
 			}
-			m.info = "rfid read yuborilmoqda..."
+			m.info = "rfid read yuborildi"
 			return m, runRFIDReadCmd(m.zebraPreferred)
 		default:
 			return m, nil
@@ -174,7 +173,7 @@ func (m tuiModel) View() string {
 	}
 
 	scaleConnected := isConnected(status, m.last, now)
-	scaleBadge := renderConnectedBadge(scaleConnected)
+	scaleState := stateText(scaleConnected)
 
 	port := strings.TrimSpace(m.last.Port)
 	if port == "" {
@@ -192,37 +191,27 @@ func (m tuiModel) View() string {
 		lag = fmt.Sprintf("%d ms", d.Milliseconds())
 	}
 
-	trendW := (w / 2) - 18
+	leftW, rightW := panelWidths(w)
+	trendW := leftW - 20
 	if trendW < 12 {
 		trendW = 12
 	}
-	trend := sparkline(m.history, trendW)
+	if trendW > 56 {
+		trendW = 56
+	}
+	trend := sparklineASCII(m.history, trendW)
 	if trend == "" {
 		trend = "-"
 	}
 	minV, maxV := historyRange(m.history)
 
-	qtyLine := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86")).Render(qty)
-	trendLine := lipgloss.NewStyle().Foreground(lipgloss.Color("112")).Render("Trend: " + trend)
-	rangeLine := lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render(fmt.Sprintf("Range: %.3f .. %.3f", minV, maxV))
-	stableLine := "Stable: " + strings.ToUpper(stableText(m.last.Stable))
-
-	scaleLines := []string{
-		"Connection: " + scaleBadge,
-		qtyLine,
-		trendLine,
-		rangeLine,
-		stableLine,
-		"Updated: " + updated,
-		"Lag: " + lag,
-		"Source: " + elideMiddle(m.sourceLine, 42),
-		"Port: " + elideMiddle(port, 42),
-	}
-
-	zebraConnected := m.zebra.Connected && strings.TrimSpace(m.zebra.Error) == ""
-	zebraBadge := renderConnectedBadge(zebraConnected)
-	if strings.EqualFold(strings.TrimSpace(m.zebra.Error), "disabled") {
-		zebraBadge = renderDisabledBadge()
+	zebraDisabled := strings.EqualFold(strings.TrimSpace(m.zebra.Error), "disabled")
+	zebraConnected := m.zebra.Connected && strings.TrimSpace(m.zebra.Error) == "" && !zebraDisabled
+	zebraState := "DOWN"
+	if zebraDisabled {
+		zebraState = "DISABLED"
+	} else if zebraConnected {
+		zebraState = "UP"
 	}
 
 	zebraName := strings.TrimSpace(m.zebra.Name)
@@ -233,63 +222,55 @@ func (m tuiModel) View() string {
 	if zebraDevice == "" {
 		zebraDevice = "-"
 	}
-	deviceState := safeText("-", m.zebra.DeviceState)
-	mediaState := safeText("-", m.zebra.MediaState)
+	deviceState := strings.ToUpper(safeText("-", m.zebra.DeviceState))
+	mediaState := strings.ToUpper(safeText("-", m.zebra.MediaState))
 	read1 := safeText("-", m.zebra.ReadLine1)
-	read2 := safeText("-", m.zebra.ReadLine2)
-	verify := safeText("-", m.zebra.Verify)
+	verify := strings.ToUpper(safeText("-", m.zebra.Verify))
 	lastEPC := safeText("-", m.zebra.LastEPC)
-	attempts := m.zebra.Attempts
-	if attempts <= 0 {
-		attempts = 1
-	}
-	autoTune := "NO"
-	if m.zebra.AutoTuned {
-		autoTune = "YES"
-	}
-	note := safeText("-", m.zebra.Note)
 	zebraUpdated := "-"
 	if !m.zebra.UpdatedAt.IsZero() {
 		zebraUpdated = m.zebra.UpdatedAt.Format("15:04:05.000")
 	}
 	zebraErr := safeText("-", m.zebra.Error)
 
+	scaleLines := []string{
+		kv("STATUS", scaleState),
+		kv("QTY", qty),
+		kv("STABLE", strings.ToUpper(stableText(m.last.Stable))),
+		kv("RANGE", fmt.Sprintf("%.3f .. %.3f", minV, maxV)),
+		kv("TREND", trend),
+		kv("UPDATED", updated),
+		kv("LAG", lag),
+		kv("SOURCE", elideMiddle(m.sourceLine, maxInt(20, leftW-16))),
+		kv("PORT", elideMiddle(port, maxInt(20, leftW-16))),
+	}
+
 	zebraLines := []string{
-		"Connection: " + zebraBadge,
-		"Printer: " + elideMiddle(zebraName, 40),
-		"Device: " + elideMiddle(zebraDevice, 40),
-		"Device state: " + strings.ToUpper(deviceState),
-		"Media state: " + strings.ToUpper(mediaState),
-		"Read line1: " + elideMiddle(read1, 40),
-		"Read line2: " + elideMiddle(read2, 40),
-		"Verify: " + strings.ToUpper(verify),
-		fmt.Sprintf("Attempts: %d", attempts),
-		"Auto tune: " + autoTune,
-		"Note: " + elideMiddle(note, 40),
-		"Last EPC: " + elideMiddle(lastEPC, 40),
-		"Updated: " + zebraUpdated,
-		"Error: " + elideMiddle(zebraErr, 40),
+		kv("STATUS", zebraState),
+		kv("PRINTER", elideMiddle(zebraName, maxInt(18, rightW-16))),
+		kv("DEVICE", elideMiddle(zebraDevice, maxInt(18, rightW-16))),
+		kv("DEVICE ST", deviceState),
+		kv("MEDIA ST", mediaState),
+		kv("VERIFY", verify),
+		kv("LAST EPC", elideMiddle(lastEPC, maxInt(18, rightW-16))),
+		kv("READ", elideMiddle(read1, maxInt(18, rightW-16))),
+		kv("UPDATED", zebraUpdated),
+		kv("ERROR", elideMiddle(zebraErr, maxInt(18, rightW-16))),
 	}
 
-	leftW := w
-	rightW := w
-	if w >= 112 {
-		leftW = (w - 2) / 2
-		rightW = w - leftW - 1
-	}
-
-	scalePanel := renderPanel("Live Reading", scaleLines, leftW, "45")
-	zebraPanel := renderPanel("Zebra RFID", zebraLines, rightW, "63")
+	header := renderHeader(w, now, scaleState, zebraState)
+	scalePanel := renderUnixPanel("SCALE MONITOR", scaleLines, leftW)
+	zebraPanel := renderUnixPanel("ZEBRA MONITOR", zebraLines, rightW)
 
 	body := scalePanel
-	if w >= 112 {
-		body = lipgloss.JoinHorizontal(lipgloss.Top, scalePanel, " ", zebraPanel)
+	if w >= 110 {
+		body = joinHorizontalPanels(scalePanel, zebraPanel, leftW, rightW)
 	} else {
-		body = lipgloss.JoinVertical(lipgloss.Left, scalePanel, zebraPanel)
+		body = scalePanel + "\n" + zebraPanel
 	}
 
-	footer := lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render(elideMiddle(m.info, w-2))
-	return lipgloss.NewStyle().Padding(0, 1).Render(body + "\n" + footer)
+	footer := renderFooter(w, m.info)
+	return header + "\n" + body + "\n" + footer
 }
 
 func waitForReadingCmd(ctx context.Context, updates <-chan Reading) tea.Cmd {
@@ -348,16 +329,8 @@ func zebraActionSummary(st ZebraStatus) string {
 	if strings.TrimSpace(st.Error) != "" {
 		return fmt.Sprintf("zebra %s xato: %s", strings.ToLower(a), st.Error)
 	}
-	auto := "no"
-	if st.AutoTuned {
-		auto = "yes"
-	}
-	attempts := st.Attempts
-	if attempts <= 0 {
-		attempts = 1
-	}
 	if a == "ENCODE" {
-		return fmt.Sprintf("zebra encode: epc=%s verify=%s attempts=%d autotune=%s line1=%s", safeText("-", st.LastEPC), safeText("UNKNOWN", st.Verify), attempts, auto, safeText("-", st.ReadLine1))
+		return fmt.Sprintf("zebra encode: epc=%s verify=%s line1=%s", safeText("-", st.LastEPC), safeText("UNKNOWN", st.Verify), safeText("-", st.ReadLine1))
 	}
 	if a == "READ" {
 		return fmt.Sprintf("zebra read: verify=%s line1=%s", safeText("UNKNOWN", st.Verify), safeText("-", st.ReadLine1))
@@ -366,7 +339,7 @@ func zebraActionSummary(st ZebraStatus) string {
 }
 
 func clockTickCmd() tea.Cmd {
-	return tea.Tick(120*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(350*time.Millisecond, func(t time.Time) tea.Msg {
 		return clockMsg(t)
 	})
 }
@@ -398,54 +371,161 @@ func viewSize(w, h int) (int, int) {
 		h = 30
 	}
 
-	width := w - 4
-	if width > 132 {
-		width = 132
+	width := w - 2
+	if width > 136 {
+		width = 136
 	}
-	if width < 64 {
-		width = 64
+	if width < 68 {
+		width = 68
 	}
 	return width, h
 }
 
-func renderPanel(title string, lines []string, width int, borderColor string) string {
-	if width < 24 {
-		width = 24
+func panelWidths(total int) (int, int) {
+	left := total
+	right := total
+	if total >= 110 {
+		left = (total - 1) / 2
+		right = total - left - 1
 	}
-	inner := width - 4
+	return left, right
+}
 
-	titleStyled := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("220")).Render(title)
-	rows := make([]string, 0, len(lines)+1)
-	rows = append(rows, titleStyled)
-	lineStyle := lipgloss.NewStyle().Width(inner).MaxWidth(inner)
+func renderHeader(width int, now time.Time, scaleState, zebraState string) string {
+	text := fmt.Sprintf("GSCALE-ZEBRA CONSOLE | %s | SCALE=%s | ZEBRA=%s", now.Format("2006-01-02 15:04:05"), scaleState, zebraState)
+	return fitLineRaw(text, width)
+}
+
+func renderFooter(width int, info string) string {
+	left := "keys: [q] quit [e] encode+print [r] read"
+	text := left + " | " + strings.TrimSpace(info)
+	if strings.TrimSpace(info) == "" {
+		text = left
+	}
+	return fitLineRaw(text, width)
+}
+
+func renderUnixPanel(title string, lines []string, width int) string {
+	if width < 32 {
+		width = 32
+	}
+	inner := width - 2
+	rows := make([]string, 0, len(lines)+2)
+	rows = append(rows, "+"+centerTitle(title, inner)+"+")
 	for _, line := range lines {
-		rows = append(rows, lineStyle.Render(line))
+		rows = append(rows, "|"+fitPanelLine(line, inner)+"|")
 	}
-	body := strings.Join(rows, "\n")
-
-	style := lipgloss.NewStyle().
-		Width(width).
-		Padding(0, 1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(borderColor))
-	return style.Render(body)
+	rows = append(rows, "+"+strings.Repeat("-", inner)+"+")
+	return strings.Join(rows, "\n")
 }
 
-func renderConnectedBadge(connected bool) string {
-	s := lipgloss.NewStyle().Bold(true).Padding(0, 1)
+func joinHorizontalPanels(left, right string, leftW, rightW int) string {
+	lrows := strings.Split(left, "\n")
+	rrows := strings.Split(right, "\n")
+	n := len(lrows)
+	if len(rrows) > n {
+		n = len(rrows)
+	}
+	out := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		l := strings.Repeat(" ", leftW)
+		if i < len(lrows) {
+			l = fitLineRaw(lrows[i], leftW)
+		}
+		r := strings.Repeat(" ", rightW)
+		if i < len(rrows) {
+			r = fitLineRaw(rrows[i], rightW)
+		}
+		out = append(out, l+" "+r)
+	}
+	return strings.Join(out, "\n")
+}
+
+func kv(label, value string) string {
+	label = strings.ToUpper(strings.TrimSpace(label))
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = "-"
+	}
+	return fmt.Sprintf("%-10s : %s", label, value)
+}
+
+func stateText(connected bool) string {
 	if connected {
-		return s.Foreground(lipgloss.Color("46")).Background(lipgloss.Color("22")).Render("CONNECTED")
+		return "UP"
 	}
-	return s.Foreground(lipgloss.Color("231")).Background(lipgloss.Color("160")).Render("DISCONNECTED")
+	return "DOWN"
 }
 
-func renderDisabledBadge() string {
-	return lipgloss.NewStyle().
-		Bold(true).
-		Padding(0, 1).
-		Foreground(lipgloss.Color("250")).
-		Background(lipgloss.Color("238")).
-		Render("DISABLED")
+func centerTitle(title string, width int) string {
+	t := " " + strings.ToUpper(strings.TrimSpace(title)) + " "
+	if width <= 0 {
+		return ""
+	}
+	if runeLen(t) > width {
+		return truncateRunes(t, width)
+	}
+	left := (width - runeLen(t)) / 2
+	right := width - runeLen(t) - left
+	return strings.Repeat("-", left) + t + strings.Repeat("-", right)
+}
+
+func fitPanelLine(text string, width int) string {
+	text = strings.ReplaceAll(text, "\n", " ")
+	text = strings.ReplaceAll(text, "\r", " ")
+	text = strings.TrimSpace(text)
+	if width <= 0 {
+		return ""
+	}
+	if runeLen(text) > width {
+		text = elideMiddle(text, width)
+	}
+	return padRight(text, width)
+}
+
+func fitLineRaw(text string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if runeLen(text) > width {
+		text = truncateRunes(text, width)
+	}
+	return padRightRaw(text, width)
+}
+
+func padRight(text string, width int) string {
+	if runeLen(text) >= width {
+		return text
+	}
+	return text + strings.Repeat(" ", width-runeLen(text))
+}
+
+func padRightRaw(text string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if runeLen(text) > width {
+		return truncateRunes(text, width)
+	}
+	if runeLen(text) < width {
+		text += strings.Repeat(" ", width-runeLen(text))
+	}
+	return text
+}
+
+func runeLen(text string) int {
+	return len([]rune(text))
+}
+
+func truncateRunes(text string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	r := []rune(text)
+	if len(r) <= max {
+		return text
+	}
+	return string(r[:max])
 }
 
 func historyRange(values []float64) (float64, float64) {
@@ -464,30 +544,30 @@ func historyRange(values []float64) (float64, float64) {
 	return minV, maxV
 }
 
-func sparkline(values []float64, width int) string {
+func sparklineASCII(values []float64, width int) string {
 	if width <= 0 || len(values) == 0 {
 		return ""
 	}
-	blocks := []rune("▁▂▃▄▅▆▇█")
+	glyphs := []rune("._-:=+*#%@")
 	if len(values) > width {
 		values = values[len(values)-width:]
 	}
 	minV, maxV := historyRange(values)
 	if math.Abs(maxV-minV) < 1e-9 {
-		return strings.Repeat(string(blocks[0]), len(values))
+		return strings.Repeat(string(glyphs[2]), len(values))
 	}
 
 	var b strings.Builder
 	for _, v := range values {
 		norm := (v - minV) / (maxV - minV)
-		idx := int(math.Round(norm * float64(len(blocks)-1)))
+		idx := int(math.Round(norm * float64(len(glyphs)-1)))
 		if idx < 0 {
 			idx = 0
 		}
-		if idx >= len(blocks) {
-			idx = len(blocks) - 1
+		if idx >= len(glyphs) {
+			idx = len(glyphs) - 1
 		}
-		b.WriteRune(blocks[idx])
+		b.WriteRune(glyphs[idx])
 	}
 	return b.String()
 }
@@ -507,4 +587,11 @@ func elideMiddle(text string, max int) string {
 	left := string(runes[:keep])
 	right := string(runes[len(runes)-keep:])
 	return left + "..." + right
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
