@@ -13,10 +13,11 @@ import (
 )
 
 type App struct {
-	cfg config.Config
-	tg  *telegram.Client
-	erp *erp.Client
-	log *log.Logger
+	cfg                config.Config
+	tg                 *telegram.Client
+	erp                *erp.Client
+	log                *log.Logger
+	startInfoMsgByChat map[int64]int64
 }
 
 func New(cfg config.Config, logger *log.Logger) *App {
@@ -24,10 +25,11 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		logger = log.Default()
 	}
 	return &App{
-		cfg: cfg,
-		tg:  telegram.New(cfg.TelegramBotToken),
-		erp: erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
-		log: logger,
+		cfg:                cfg,
+		tg:                 telegram.New(cfg.TelegramBotToken),
+		erp:                erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
+		log:                logger,
+		startInfoMsgByChat: make(map[int64]int64),
 	}
 }
 
@@ -86,12 +88,45 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 
 	switch cmd {
 	case "/start":
-		return commands.HandleStart(ctx, a.deps(), msg)
+		messageID, err := commands.HandleStart(ctx, a.deps(), msg)
+		if err != nil {
+			return err
+		}
+		a.trackStartInfoMessage(ctx, msg.Chat.ID, messageID)
+		return nil
 	case "/batch":
-		return commands.HandleBatch(ctx, a.deps(), msg)
+		if err := commands.HandleBatch(ctx, a.deps(), msg); err != nil {
+			return err
+		}
+		a.deleteTrackedStartInfoMessage(ctx, msg.Chat.ID)
+		return nil
 	default:
 		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch")
 	}
+}
+
+func (a *App) trackStartInfoMessage(ctx context.Context, chatID, messageID int64) {
+	if messageID <= 0 {
+		return
+	}
+
+	if prev := a.startInfoMsgByChat[chatID]; prev > 0 && prev != messageID {
+		if err := a.tg.DeleteMessage(ctx, chatID, prev); err != nil {
+			a.log.Printf("delete old start-info warning: %v", err)
+		}
+	}
+	a.startInfoMsgByChat[chatID] = messageID
+}
+
+func (a *App) deleteTrackedStartInfoMessage(ctx context.Context, chatID int64) {
+	messageID := a.startInfoMsgByChat[chatID]
+	if messageID <= 0 {
+		return
+	}
+	if err := a.tg.DeleteMessage(ctx, chatID, messageID); err != nil {
+		a.log.Printf("delete start-info warning: %v", err)
+	}
+	delete(a.startInfoMsgByChat, chatID)
 }
 
 func (a *App) maybeDeleteCommandMessage(ctx context.Context, msg telegram.Message, cmd string) {

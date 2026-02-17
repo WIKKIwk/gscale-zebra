@@ -8,10 +8,10 @@ import (
 	"bot/internal/telegram"
 )
 
-func HandleStart(ctx context.Context, deps Deps, msg telegram.Message) error {
+func HandleStart(ctx context.Context, deps Deps, msg telegram.Message) (int64, error) {
 	user, err := deps.ERP.CheckConnection(ctx)
 	if err != nil {
-		return deps.TG.SendMessage(ctx, msg.Chat.ID, "ERPNext ulanishi xato: "+err.Error())
+		return 0, deps.TG.SendMessage(ctx, msg.Chat.ID, "ERPNext ulanishi xato: "+err.Error())
 	}
 
 	info := strings.Join([]string{
@@ -21,5 +21,5 @@ func HandleStart(ctx context.Context, deps Deps, msg telegram.Message) error {
 		"Davom etish uchun /batch ni bosing.",
 	}, "\n")
 
-	return deps.TG.SendMessage(ctx, msg.Chat.ID, info)
+	return deps.TG.SendMessageWithInlineKeyboardAndReturnID(ctx, msg.Chat.ID, info, nil)
 }

@@ -28,6 +28,14 @@ type apiOKResponse struct {
 	Description string `json:"description"`
 }
 
+type sendMessageResponse struct {
+	OK          bool   `json:"ok"`
+	Description string `json:"description"`
+	Result      struct {
+		MessageID int64 `json:"message_id"`
+	} `json:"result"`
+}
+
 type Update struct {
 	UpdateID    int64        `json:"update_id"`
 	Message     *Message     `json:"message"`
@@ -119,21 +127,27 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64, timeoutSec int) (
 }
 
 func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) error {
-	return c.SendMessageWithInlineKeyboard(ctx, chatID, text, nil)
+	_, err := c.SendMessageWithInlineKeyboardAndReturnID(ctx, chatID, text, nil)
+	return err
 }
 
 func (c *Client) SendMessageWithInlineKeyboard(ctx context.Context, chatID int64, text string, keyboard *InlineKeyboardMarkup) error {
+	_, err := c.SendMessageWithInlineKeyboardAndReturnID(ctx, chatID, text, keyboard)
+	return err
+}
+
+func (c *Client) SendMessageWithInlineKeyboardAndReturnID(ctx context.Context, chatID int64, text string, keyboard *InlineKeyboardMarkup) (int64, error) {
 	form := url.Values{}
 	form.Set("chat_id", strconv.FormatInt(chatID, 10))
 	form.Set("text", text)
 	if keyboard != nil {
 		b, err := json.Marshal(keyboard)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		form.Set("reply_markup", string(b))
 	}
-	return c.callAPI(ctx, "sendMessage", form)
+	return c.callSendMessage(ctx, form)
 }
 
 func (c *Client) DeleteMessage(ctx context.Context, chatID, messageID int64) error {
@@ -162,6 +176,33 @@ func (c *Client) AnswerInlineQuery(ctx context.Context, inlineQueryID string, re
 	form.Set("cache_time", strconv.Itoa(cacheSeconds))
 	form.Set("is_personal", "true")
 	return c.callAPI(ctx, "answerInlineQuery", form)
+}
+
+func (c *Client) callSendMessage(ctx context.Context, form url.Values) (int64, error) {
+	u := fmt.Sprintf("%s/bot%s/sendMessage", c.baseURL, c.token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(form.Encode()))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	var payload sendMessageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return 0, err
+	}
+	if !payload.OK {
+		if strings.TrimSpace(payload.Description) == "" {
+			payload.Description = "sendMessage OK=false"
+		}
+		return 0, fmt.Errorf("telegram: %s", payload.Description)
+	}
+	return payload.Result.MessageID, nil
 }
 
 func (c *Client) callAPI(ctx context.Context, method string, form url.Values) error {
