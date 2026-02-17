@@ -17,7 +17,17 @@ func HandleBatch(ctx context.Context, deps Deps, msg telegram.Message) error {
 			},
 		},
 	}
-	return deps.TG.SendMessageWithInlineKeyboard(ctx, msg.Chat.ID, "Item tanlang:", keyboard)
+
+	err := deps.TG.SendMessageWithInlineKeyboard(ctx, msg.Chat.ID, "Item tanlang:", keyboard)
+	if err == nil {
+		return nil
+	}
+
+	if isInlineButtonUnsupported(err) {
+		return deps.TG.SendMessage(ctx, msg.Chat.ID, "Inline mode o'chirilgan. BotFather'da /setinline ni yoqing, keyin /batch ni qayta bering.")
+	}
+
+	return err
 }
 
 func HandleBatchInlineQuery(ctx context.Context, deps Deps, q telegram.InlineQuery) error {
@@ -68,4 +78,12 @@ func buildItemResults(items []erp.Item) []telegram.InlineQueryResultArticle {
 		})
 	}
 	return results
+}
+
+func isInlineButtonUnsupported(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "button_type_invalid") || strings.Contains(s, "inline mode")
 }

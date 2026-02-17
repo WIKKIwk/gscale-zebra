@@ -63,7 +63,7 @@ type InlineKeyboardMarkup struct {
 
 type InlineKeyboardButton struct {
 	Text                         string `json:"text"`
-	SwitchInlineQueryCurrentChat string `json:"switch_inline_query_current_chat,omitempty"`
+	SwitchInlineQueryCurrentChat string `json:"switch_inline_query_current_chat"`
 }
 
 type InlineQueryResultArticle struct {
