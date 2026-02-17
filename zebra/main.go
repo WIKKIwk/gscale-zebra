@@ -194,15 +194,25 @@ func runEPCTest(args []string) error {
 	if err := SendRaw(p.DevicePath, []byte(stream)); err != nil {
 		return err
 	}
-	time.Sleep(900 * time.Millisecond)
+	time.Sleep(700 * time.Millisecond)
+
+	// Printerning o'zidan EPC readback urinish.
+	_ = SendRaw(p.DevicePath, []byte("! U1 setvar \"rfid.tag.read.content\" \"epc\"\r\n"))
+	time.Sleep(80 * time.Millisecond)
+	_ = SendRaw(p.DevicePath, []byte("! U1 do \"rfid.tag.read.execute\"\r\n"))
+	time.Sleep(260 * time.Millisecond)
 
 	afterCount, _ := QuerySGDVar(p.DevicePath, "odometer.total_label_count", *timeout)
 	afterMedia, _ := QuerySGDVar(p.DevicePath, "media.status", *timeout)
 	afterDevice, _ := QuerySGDVar(p.DevicePath, "device.status", *timeout)
+	read1, _ := QuerySGDVar(p.DevicePath, "rfid.tag.read.result_line1", *timeout)
+	read2, _ := QuerySGDVar(p.DevicePath, "rfid.tag.read.result_line2", *timeout)
+	verify := inferVerify(read1, read2, norm)
 	hs, hsErr := QueryHostStatus(p.DevicePath, *timeout)
 
 	fmt.Printf("Before: label_count=%s media=%s device=%s\n", safeStr(beforeCount, "?"), safeStr(beforeMedia, "?"), safeStr(beforeDevice, "?"))
 	fmt.Printf("After : label_count=%s media=%s device=%s\n", safeStr(afterCount, "?"), safeStr(afterMedia, "?"), safeStr(afterDevice, "?"))
+	fmt.Printf("Read  : line1=%s line2=%s verify=%s\n", safeStr(read1, "-"), safeStr(read2, "-"), verify)
 	if hsErr != nil {
 		fmt.Printf("~HS   : no response (%v)\n", hsErr)
 	} else {
@@ -297,6 +307,26 @@ func printUsage() {
 	fmt.Println("  zebra epc-test [--device /dev/usb/lp0] [--epc HEX] [--feed] [--print-human] [--send]")
 	fmt.Println("  zebra calibrate [--device /dev/usb/lp0] [--dry-run] [--save=true]")
 	fmt.Println("  zebra self-check [--device /dev/usb/lp0] [--print]")
+}
+
+func inferVerify(line1, line2, expected string) string {
+	line1 = strings.TrimSpace(strings.Trim(line1, "\""))
+	line2 = strings.TrimSpace(strings.Trim(line2, "\""))
+	all := strings.ToUpper(strings.ReplaceAll(line1+line2, " ", ""))
+	if line1 == "" && line2 == "" {
+		return "UNKNOWN"
+	}
+	if strings.Contains(strings.ToLower(line1+" "+line2), "no tag") {
+		return "NO TAG"
+	}
+	expected = strings.ToUpper(strings.TrimSpace(expected))
+	if expected != "" {
+		if strings.Contains(all, expected) {
+			return "MATCH"
+		}
+		return "MISMATCH"
+	}
+	return "OK"
 }
 
 func safeStr(v, fallback string) string {

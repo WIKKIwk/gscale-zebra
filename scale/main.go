@@ -19,6 +19,7 @@ func main() {
 	defer cancel()
 
 	updates := make(chan Reading, 32)
+	var zebraUpdates <-chan ZebraStatus
 	var sourceLine string
 	var serialErr error
 	started := false
@@ -48,7 +49,13 @@ func main() {
 		exitErr(errors.New("scale source not available"))
 	}
 
-	if err := runTUI(ctx, updates, sourceLine, serialErr); err != nil {
+	if !cfg.disableZebra {
+		zch := make(chan ZebraStatus, 16)
+		startZebraMonitor(ctx, cfg.zebraDevice, cfg.zebraInterval, zch)
+		zebraUpdates = zch
+	}
+
+	if err := runTUI(ctx, updates, zebraUpdates, sourceLine, cfg.zebraDevice, serialErr); err != nil {
 		exitErr(err)
 	}
 }

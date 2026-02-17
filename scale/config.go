@@ -17,6 +17,9 @@ type appConfig struct {
 	bridgeURL      string
 	bridgeInterval time.Duration
 	disableBridge  bool
+	zebraDevice    string
+	zebraInterval  time.Duration
+	disableZebra   bool
 }
 
 func parseFlags() (appConfig, error) {
@@ -32,6 +35,9 @@ func parseFlags() (appConfig, error) {
 	flag.StringVar(&cfg.bridgeURL, "bridge-url", "http://127.0.0.1:18000/api/v1/scale", "fallback HTTP endpoint")
 	flag.DurationVar(&cfg.bridgeInterval, "bridge-interval", 120*time.Millisecond, "bridge poll interval")
 	flag.BoolVar(&cfg.disableBridge, "no-bridge", false, "disable HTTP bridge fallback")
+	flag.StringVar(&cfg.zebraDevice, "zebra-device", "", "zebra printer path, example /dev/usb/lp0")
+	flag.DurationVar(&cfg.zebraInterval, "zebra-interval", 900*time.Millisecond, "zebra monitor poll interval")
+	flag.BoolVar(&cfg.disableZebra, "no-zebra", false, "disable zebra monitor/actions in TUI")
 	flag.Parse()
 
 	bauds, err := parseBaudList(baudListRaw, preferredBaud)

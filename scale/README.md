@@ -1,6 +1,6 @@
 # Scale monitor (Go)
 
-USB serial tarozi qiymatini terminalda (TUI) ko'rsatadi.
+USB serial tarozi qiymatini terminalda (TUI) ko'rsatadi va Zebra RFID printer holatini ham monitor qiladi.
 
 ## Aniqlangan holat
 
@@ -16,7 +16,11 @@ cd scale
 go run .
 ```
 
-Chiqish: `q` tugmasi.
+Chiqish:
+
+- `q` - chiqish
+- `e` - Zebra'ga 1 ta test EPC encode + readback urinish
+- `r` - faqat RFID read urinish
 
 ## Muhim
 
@@ -34,7 +38,7 @@ Agar port band bo'lmasa, auto-detect bilan serialdan bevosita o'qiydi.
 
 ## Parametrlar
 
-- `--device /dev/ttyUSB0` - qurilmani qo'lda berish
+- `--device /dev/ttyUSB0` - tarozi qurilmasini qo'lda berish
 - `--baud 9600` - asosiy baudrate
 - `--baud-list 9600,19200,38400,57600,115200` - detect payti probelar
 - `--probe-timeout 800ms` - probe davomiyligi
@@ -42,3 +46,17 @@ Agar port band bo'lmasa, auto-detect bilan serialdan bevosita o'qiydi.
 - `--bridge-url http://127.0.0.1:18000/api/v1/scale` - fallback endpoint
 - `--bridge-interval 250ms` - fallback poll interval
 - `--no-bridge` - fallback'ni o'chirish
+- `--zebra-device /dev/usb/lp0` - Zebra printer yo'lini qo'lda berish
+- `--zebra-interval 900ms` - Zebra monitor poll interval
+- `--no-zebra` - Zebra monitoring va `e/r` actionlarni o'chirish
+
+## EPC tasdiq haqida
+
+Printer ichidan `rfid.tag.read.result_line1/line2` orqali readback olinadi.
+
+- `MATCH` - qaytgan qatorda kutilgan EPC topildi
+- `NO TAG` - printer o'qish zonasida tag topmadi
+- `MISMATCH` - javob bor, lekin kutilgan EPC topilmadi
+- `UNKNOWN` - javob bo'sh yoki noaniq
+
+Amaliyotda 100% yakuniy tasdiq uchun tashqi RFID reader bilan ham tekshirish tavsiya qilinadi.
