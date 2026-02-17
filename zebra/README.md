@@ -33,5 +33,6 @@ go run . self-check --print
 
 - `print-test` RFID encode qilmaydi.
 - `epc-test` default `dry-run`; real encode uchun `--send` kerak.
+- `--send` rejimida default holatda EPC tagga yoziladi va o'sha EPC matni label ustiga ham print qilinadi (`--print-human=true`, `--feed=true`).
 - `calibrate` bir nechta label/tag feed qilishi mumkin.
 - Taglarni tejash uchun `print-test`da `--copies` 1..3, `epc-test` esa 1 taga cheklangan.

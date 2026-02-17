@@ -11,8 +11,8 @@ func runEPCTest(args []string) error {
 	fs := flag.NewFlagSet("epc-test", flag.ContinueOnError)
 	device := fs.String("device", "", "printer device path (example: /dev/usb/lp0)")
 	epc := fs.String("epc", "3034257BF7194E4000000001", "EPC hex")
-	feed := fs.Bool("feed", false, "feed label after encode")
-	printHuman := fs.Bool("print-human", false, "print EPC text on label")
+	feed := fs.Bool("feed", true, "feed label after encode")
+	printHuman := fs.Bool("print-human", true, "print EPC text on label")
 	send := fs.Bool("send", false, "actually send encode command (consumes tag)")
 	timeout := fs.Duration("timeout", 1500*time.Millisecond, "status query timeout")
 	if err := fs.Parse(args); err != nil {
