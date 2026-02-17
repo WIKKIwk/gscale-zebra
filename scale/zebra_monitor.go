@@ -152,10 +152,6 @@ func runZebraEncodeAndRead(preferredDevice, epc string, timeout time.Duration) Z
 		}
 	}
 
-	// Labelni yakunda chiqarib yuboramiz; verify undan oldin bo'lib bo'lgan.
-	_ = sendRawRetry(p.DevicePath, []byte("~PH\n"), 4, 120*time.Millisecond)
-	time.Sleep(120 * time.Millisecond)
-
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
 	if st.Verify != "MATCH" && strings.TrimSpace(st.Error) == "" {
