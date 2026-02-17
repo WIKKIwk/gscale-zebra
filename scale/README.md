@@ -1,0 +1,44 @@
+# Scale monitor (Go)
+
+USB serial tarozi qiymatini terminalda (TUI) ko'rsatadi.
+
+## Aniqlangan holat
+
+Hozirgi kompyuterda tarozi `CH340` sifatida ko'rindi va `/dev/ttyUSB0` ga tushgan:
+
+- `lsusb`: `1a86:7523 QinHeng CH340 serial converter`
+- `by-id`: `usb-1a86_USB2.0-Ser_-if00-port0 -> /dev/ttyUSB0`
+
+## Ishga tushirish
+
+```bash
+cd scale
+go run .
+```
+
+Chiqish: `q` tugmasi.
+
+## Muhim
+
+Hozir `/dev/ttyUSB0` ni `ZebraBridge.Web` jarayoni ishlatayotgani aniqlandi, shu sabab dastur avtomatik ravishda HTTP bridge fallback'ga o'tadi:
+
+- `http://127.0.0.1:18000/api/v1/scale`
+
+Agar to'g'ridan-to'g'ri serial o'qimoqchi bo'lsangiz:
+
+```bash
+go run . --no-bridge
+```
+
+Agar port band bo'lmasa, auto-detect bilan serialdan bevosita o'qiydi.
+
+## Parametrlar
+
+- `--device /dev/ttyUSB0` - qurilmani qo'lda berish
+- `--baud 9600` - asosiy baudrate
+- `--baud-list 9600,19200,38400,57600,115200` - detect payti probelar
+- `--probe-timeout 800ms` - probe davomiyligi
+- `--unit kg` - default birlik
+- `--bridge-url http://127.0.0.1:18000/api/v1/scale` - fallback endpoint
+- `--bridge-interval 250ms` - fallback poll interval
+- `--no-bridge` - fallback'ni o'chirish
