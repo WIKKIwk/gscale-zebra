@@ -94,8 +94,8 @@ func NormalizeEPC(epc string) (string, error) {
 	if !hexOnlyRegex.MatchString(v) {
 		return "", errors.New("epc faqat hex bo'lishi kerak")
 	}
-	if len(v)%4 != 0 {
-		return "", errors.New("epc uzunligi 4 ga bo'linishi kerak (word boundary)")
+	if len(v)%2 != 0 {
+		return "", errors.New("epc uzunligi juft bo'lishi kerak")
 	}
 	if len(v) < 8 || len(v) > 64 {
 		return "", errors.New("epc uzunligi 8..64 hex oralig'ida bo'lsin")

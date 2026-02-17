@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	corepkg "core"
 	"fmt"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ type tuiModel struct {
 	width          int
 	height         int
 	now            time.Time
+	autoDetector   *corepkg.StableEPCDetector
 }
 
 func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, serialErr error) error {
@@ -47,6 +49,7 @@ func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan Zeb
 		message:        "scale oqimi kutilmoqda",
 		info:           "ready",
 		now:            time.Now(),
+		autoDetector:   corepkg.NewStableEPCDetector(corepkg.DefaultStableEPCConfig()),
 		zebra: ZebraStatus{
 			Connected: false,
 			Verify:    "-",
@@ -115,7 +118,15 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.message = "ok"
 		}
-		return m, waitForReadingCmd(m.ctx, m.updates)
+
+		cmd := waitForReadingCmd(m.ctx, m.updates)
+		if m.zebraUpdates != nil && m.autoDetector != nil {
+			if epc, ok := m.autoDetector.Observe(upd.Weight, upd.UpdatedAt); ok {
+				m.info = fmt.Sprintf("auto encode queued: epc=%s", epc)
+				cmd = tea.Batch(cmd, runEncodeEPCCmdWithEPC(m.zebraPreferred, epc))
+			}
+		}
+		return m, cmd
 	case zebraMsg:
 		st := msg.status
 		if st.UpdatedAt.IsZero() {
@@ -273,8 +284,12 @@ func waitForZebraCmd(ctx context.Context, updates <-chan ZebraStatus) tea.Cmd {
 }
 
 func runEncodeEPCCmd(preferredDevice string) tea.Cmd {
+	epc := generateTestEPC(time.Now())
+	return runEncodeEPCCmdWithEPC(preferredDevice, epc)
+}
+
+func runEncodeEPCCmdWithEPC(preferredDevice, epc string) tea.Cmd {
 	return func() tea.Msg {
-		epc := generateTestEPC(time.Now())
 		st := runZebraEncodeAndRead(preferredDevice, epc, 1400*time.Millisecond)
 		st.UpdatedAt = time.Now()
 		return zebraMsg{status: st}

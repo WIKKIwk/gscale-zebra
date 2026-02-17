@@ -3,6 +3,7 @@ module scale
 go 1.25.7
 
 require (
+	core v0.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
@@ -27,3 +28,5 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.3.8 // indirect
 )
+
+replace core => ../core

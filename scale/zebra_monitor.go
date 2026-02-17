@@ -361,8 +361,8 @@ func normalizeEPC(epc string) (string, error) {
 	if !zebraHexOnlyRegex.MatchString(v) {
 		return "", errors.New("epc faqat hex bo'lishi kerak")
 	}
-	if len(v)%4 != 0 {
-		return "", errors.New("epc uzunligi 4 ga bo'linishi kerak")
+	if len(v)%2 != 0 {
+		return "", errors.New("epc uzunligi juft bo'lishi kerak")
 	}
 	if len(v) < 8 || len(v) > 64 {
 		return "", errors.New("epc uzunligi 8..64 oralig'ida bo'lsin")
