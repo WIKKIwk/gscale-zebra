@@ -48,7 +48,7 @@ func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan Zeb
 		zebraPreferred: zebraPreferred,
 		last:           Reading{Unit: "kg"},
 		message:        "scale oqimi kutilmoqda",
-		info:           "keys: q quit | e encode test epc | r read epc",
+		info:           "keys: q quit | e encode+print epc | r read epc",
 		now:            time.Now(),
 		history:        make([]float64, 0, 256),
 		zebra: ZebraStatus{
@@ -95,7 +95,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.info = "zebra monitor o'chirilgan (--no-zebra)"
 				return m, nil
 			}
-			m.info = "epc encode yuborilmoqda (1 tag)..."
+			m.info = "epc encode+print yuborilmoqda (1 label/tag)..."
 			return m, runEncodeEPCCmd(m.zebraPreferred)
 		case "r":
 			if m.zebraUpdates == nil {

@@ -146,7 +146,7 @@ func runZebraEncodeAndRead(preferredDevice, epc string, timeout time.Duration) Z
 		return st
 	}
 
-	time.Sleep(420 * time.Millisecond)
+	time.Sleep(900 * time.Millisecond)
 	if err := zebraSendSGD(p.DevicePath, `! U1 setvar "rfid.tag.read.content" "epc"`); err != nil {
 		st.Error = err.Error()
 		applyZebraSnapshot(&st, p, timeout)
@@ -209,10 +209,16 @@ func buildRFIDEncodeCommand(epc string) (string, error) {
 	}
 	return "~PS\n" +
 		"^XA\n" +
+		"^MMT\n" +
+		"^PW560\n" +
+		"^LL260\n" +
 		"^RS8,,,1,N\n" +
 		fmt.Sprintf("^RFW,H,,,A^FD%s^FS\n", norm) +
+		"^FO28,24^A0N,32,32\n" +
+		fmt.Sprintf("^FD%s^FS\n", norm) +
 		"^PQ1\n" +
-		"^XZ\n", nil
+		"^XZ\n" +
+		"~PH\n", nil
 }
 
 func normalizeEPC(epc string) (string, error) {
