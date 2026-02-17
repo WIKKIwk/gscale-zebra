@@ -20,6 +20,8 @@ type appConfig struct {
 	zebraDevice    string
 	zebraInterval  time.Duration
 	disableZebra   bool
+	botDir         string
+	disableBot     bool
 }
 
 func parseFlags() (appConfig, error) {
@@ -38,6 +40,8 @@ func parseFlags() (appConfig, error) {
 	flag.StringVar(&cfg.zebraDevice, "zebra-device", "", "zebra printer path, example /dev/usb/lp0")
 	flag.DurationVar(&cfg.zebraInterval, "zebra-interval", 900*time.Millisecond, "zebra monitor poll interval")
 	flag.BoolVar(&cfg.disableZebra, "no-zebra", false, "disable zebra monitor/actions in TUI")
+	flag.StringVar(&cfg.botDir, "bot-dir", "../bot", "telegram bot module directory")
+	flag.BoolVar(&cfg.disableBot, "no-bot", false, "disable auto-start telegram bot")
 	flag.Parse()
 
 	bauds, err := parseBaudList(baudListRaw, preferredBaud)

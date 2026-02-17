@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -53,6 +54,12 @@ func main() {
 		zch := make(chan ZebraStatus, 16)
 		startZebraMonitor(ctx, cfg.zebraDevice, cfg.zebraInterval, zch)
 		zebraUpdates = zch
+	}
+
+	if !cfg.disableBot {
+		if err := startBotProcess(ctx, cfg.botDir); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: bot auto-start bo'lmadi: %v\n", err)
+		}
 	}
 
 	if err := runTUI(ctx, updates, zebraUpdates, sourceLine, cfg.zebraDevice, serialErr); err != nil {

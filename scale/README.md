@@ -36,6 +36,22 @@ go run . --no-bridge
 
 Agar port band bo'lmasa, auto-detect bilan serialdan bevosita o'qiydi.
 
+## Bot Auto-Start
+
+Default holatda TUI ishga tushganda Telegram bot ham birga ishga tushadi (`../bot` papkadan `go run ./cmd/bot`).
+
+Agar botni o'chirmoqchi bo'lsangiz:
+
+```bash
+go run . --no-bot
+```
+
+Agar bot papkasi boshqa joyda bo'lsa:
+
+```bash
+go run . --bot-dir /home/wikki/local.git/gscale-zebra/bot
+```
+
 ## Parametrlar
 
 - `--device /dev/ttyUSB0` - tarozi qurilmasini qo'lda berish
@@ -49,6 +65,8 @@ Agar port band bo'lmasa, auto-detect bilan serialdan bevosita o'qiydi.
 - `--zebra-device /dev/usb/lp0` - Zebra printer yo'lini qo'lda berish
 - `--zebra-interval 900ms` - Zebra monitor poll interval
 - `--no-zebra` - Zebra monitoring va `e/r` actionlarni o'chirish
+- `--bot-dir ../bot` - bot modul joylashuvi
+- `--no-bot` - bot auto-start ni o'chirish
 
 ## EPC tasdiq haqida
 
