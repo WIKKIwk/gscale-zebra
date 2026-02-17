@@ -19,7 +19,7 @@ func runTUI(ctx context.Context, updates <-chan Reading, sourceLine string, seri
 		if err == nil {
 			restore = func() error { return term.Restore(stdinFD, oldState) }
 		}
-		fmt.Print("\033[?1049h\033[H\033[2J\033[?25l")
+		fmt.Print("\033[H\033[2J\033[?25l")
 	}
 
 	defer func() {
@@ -27,7 +27,7 @@ func runTUI(ctx context.Context, updates <-chan Reading, sourceLine string, seri
 			_ = restore()
 		}
 		if isTTY {
-			fmt.Print("\033[?25h\033[?1049l")
+			fmt.Print("\033[?25h")
 		}
 		fmt.Print("\n")
 	}()
@@ -232,12 +232,9 @@ func frameSize() (int, int) {
 		h = 28
 	}
 
-	width := w - 2
-	if width > 110 {
-		width = 110
-	}
-	if width < 24 {
-		width = w - 1
+	width := 76
+	if w-4 < width {
+		width = w - 4
 	}
 	if width < 24 {
 		width = 24
