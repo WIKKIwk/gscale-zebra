@@ -1,10 +1,11 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 )
+
+const maxPrintCopies = 20
 
 func runPrintTest(args []string) error {
 	fs := flag.NewFlagSet("print-test", flag.ContinueOnError)
@@ -19,8 +20,8 @@ func runPrintTest(args []string) error {
 	if *copies < 1 {
 		*copies = 1
 	}
-	if *copies > 3 {
-		return errors.New("copies 3 dan ko'p bo'lmasin (taglarni tejash uchun)")
+	if *copies > maxPrintCopies {
+		return fmt.Errorf("copies %d dan ko'p bo'lmasin", maxPrintCopies)
 	}
 
 	p, err := SelectPrinter(*device)

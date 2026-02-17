@@ -18,8 +18,8 @@ func BuildTestLabelZPL(message string, copies int) string {
 	if copies < 1 {
 		copies = 1
 	}
-	if copies > 3 {
-		copies = 3
+	if copies > maxPrintCopies {
+		copies = maxPrintCopies
 	}
 	msg := sanitizeZPLText(message)
 	now := time.Now().Format("2006-01-02 15:04:05")
