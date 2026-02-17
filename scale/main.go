@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -56,13 +57,28 @@ func main() {
 		zebraUpdates = zch
 	}
 
+	var botProc *BotProcess
 	if !cfg.disableBot {
-		if err := startBotProcess(ctx, cfg.botDir); err != nil {
+		bp, err := startBotProcess(cfg.botDir)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: bot auto-start bo'lmadi: %v\n", err)
+		} else {
+			botProc = bp
+			defer func() {
+				if stopErr := botProc.Stop(3 * time.Second); stopErr != nil {
+					fmt.Fprintf(os.Stderr, "warning: bot stop xato: %v\n", stopErr)
+				}
+			}()
 		}
 	}
 
 	if err := runTUI(ctx, updates, zebraUpdates, sourceLine, cfg.zebraDevice, serialErr); err != nil {
+		cancel()
+		if botProc != nil {
+			if stopErr := botProc.Stop(3 * time.Second); stopErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: bot stop xato: %v\n", stopErr)
+			}
+		}
 		exitErr(err)
 	}
 }
