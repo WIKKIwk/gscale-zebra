@@ -11,7 +11,7 @@ import (
 var hexOnlyRegex = regexp.MustCompile(`^[0-9A-F]+$`)
 
 func BuildPrintTestCommandStream(message string, copies int) string {
-	return "~PS\n" + BuildTestLabelZPL(message, copies)
+	return BuildTestLabelZPL(message, copies)
 }
 
 func BuildTestLabelZPL(message string, copies int) string {
@@ -54,7 +54,6 @@ func BuildRFIDEncodeCommandStream(epc string, copies int, feedAfter bool, printH
 	}
 
 	var b strings.Builder
-	b.WriteString("~PS\n") // resume printing
 	b.WriteString("^XA\n")
 	if feedAfter {
 		b.WriteString("^MMT\n")

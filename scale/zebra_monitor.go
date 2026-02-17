@@ -359,8 +359,7 @@ func buildRFIDEncodeCommand(epc string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "~PS\n" +
-		"^XA\n" +
+	return "^XA\n" +
 		"^MMT\n" +
 		"^PW560\n" +
 		"^LL260\n" +

@@ -118,36 +118,14 @@ func SendRaw(device string, payload []byte) error {
 		return errors.New("payload bo'sh")
 	}
 
-	fd, err := syscall.Open(device, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+	fd, err := syscall.Open(device, syscall.O_WRONLY, 0)
 	if err != nil {
 		return fmt.Errorf("device ochilmadi: %w", err)
 	}
 	defer syscall.Close(fd)
 
-	deadline := time.Now().Add(2 * time.Second)
-	written := 0
-	for written < len(payload) {
-		n, werr := syscall.Write(fd, payload[written:])
-		if n > 0 {
-			written += n
-		}
-		if werr != nil {
-			errNo, ok := werr.(syscall.Errno)
-			if ok && (errNo == syscall.EAGAIN || errNo == syscall.EWOULDBLOCK) {
-				if time.Now().After(deadline) {
-					return fmt.Errorf("yozib bo'lmadi: timeout (%w)", werr)
-				}
-				time.Sleep(25 * time.Millisecond)
-				continue
-			}
-			return fmt.Errorf("yozib bo'lmadi: %w", werr)
-		}
-		if n == 0 {
-			if time.Now().After(deadline) {
-				return fmt.Errorf("yozib bo'lmadi: timeout")
-			}
-			time.Sleep(25 * time.Millisecond)
-		}
+	if err := writeFDNonBlocking(fd, payload, time.Now().Add(4*time.Second)); err != nil {
+		return fmt.Errorf("yozib bo'lmadi: %w", err)
 	}
 	return nil
 }
