@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -35,7 +34,6 @@ type tuiModel struct {
 	width          int
 	height         int
 	now            time.Time
-	history        []float64
 }
 
 func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, serialErr error) error {
@@ -49,7 +47,6 @@ func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan Zeb
 		message:        "scale oqimi kutilmoqda",
 		info:           "ready",
 		now:            time.Now(),
-		history:        make([]float64, 0, 256),
 		zebra: ZebraStatus{
 			Connected: false,
 			Verify:    "-",
@@ -110,12 +107,6 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		upd := msg.reading
 		if upd.Unit == "" && m.last.Unit != "" {
 			upd.Unit = m.last.Unit
-		}
-		if upd.Weight != nil {
-			m.history = append(m.history, *upd.Weight)
-			if len(m.history) > 240 {
-				m.history = m.history[len(m.history)-240:]
-			}
 		}
 
 		m.last = upd
@@ -192,18 +183,6 @@ func (m tuiModel) View() string {
 	}
 
 	leftW, rightW := panelWidths(w)
-	trendW := leftW - 20
-	if trendW < 12 {
-		trendW = 12
-	}
-	if trendW > 56 {
-		trendW = 56
-	}
-	trend := sparklineASCII(m.history, trendW)
-	if trend == "" {
-		trend = "-"
-	}
-	minV, maxV := historyRange(m.history)
 
 	zebraDisabled := strings.EqualFold(strings.TrimSpace(m.zebra.Error), "disabled")
 	zebraConnected := m.zebra.Connected && strings.TrimSpace(m.zebra.Error) == "" && !zebraDisabled
@@ -237,8 +216,6 @@ func (m tuiModel) View() string {
 		kv("STATUS", scaleState),
 		kv("QTY", qty),
 		kv("STABLE", strings.ToUpper(stableText(m.last.Stable))),
-		kv("RANGE", fmt.Sprintf("%.3f .. %.3f", minV, maxV)),
-		kv("TREND", trend),
 		kv("UPDATED", updated),
 		kv("LAG", lag),
 		kv("SOURCE", elideMiddle(m.sourceLine, maxInt(20, leftW-16))),
@@ -411,11 +388,11 @@ func renderUnixPanel(title string, lines []string, width int) string {
 	}
 	inner := width - 2
 	rows := make([]string, 0, len(lines)+2)
-	rows = append(rows, "+"+centerTitle(title, inner)+"+")
+	rows = append(rows, "┌"+centerTitle(title, inner)+"┐")
 	for _, line := range lines {
-		rows = append(rows, "|"+fitPanelLine(line, inner)+"|")
+		rows = append(rows, "│"+fitPanelLine(line, inner)+"│")
 	}
-	rows = append(rows, "+"+strings.Repeat("-", inner)+"+")
+	rows = append(rows, "└"+strings.Repeat("─", inner)+"┘")
 	return strings.Join(rows, "\n")
 }
 
@@ -467,7 +444,7 @@ func centerTitle(title string, width int) string {
 	}
 	left := (width - runeLen(t)) / 2
 	right := width - runeLen(t) - left
-	return strings.Repeat("-", left) + t + strings.Repeat("-", right)
+	return strings.Repeat("─", left) + t + strings.Repeat("─", right)
 }
 
 func fitPanelLine(text string, width int) string {
@@ -526,50 +503,6 @@ func truncateRunes(text string, max int) string {
 		return text
 	}
 	return string(r[:max])
-}
-
-func historyRange(values []float64) (float64, float64) {
-	if len(values) == 0 {
-		return 0, 0
-	}
-	minV, maxV := values[0], values[0]
-	for _, v := range values[1:] {
-		if v < minV {
-			minV = v
-		}
-		if v > maxV {
-			maxV = v
-		}
-	}
-	return minV, maxV
-}
-
-func sparklineASCII(values []float64, width int) string {
-	if width <= 0 || len(values) == 0 {
-		return ""
-	}
-	glyphs := []rune("._-:=+*#%@")
-	if len(values) > width {
-		values = values[len(values)-width:]
-	}
-	minV, maxV := historyRange(values)
-	if math.Abs(maxV-minV) < 1e-9 {
-		return strings.Repeat(string(glyphs[2]), len(values))
-	}
-
-	var b strings.Builder
-	for _, v := range values {
-		norm := (v - minV) / (maxV - minV)
-		idx := int(math.Round(norm * float64(len(glyphs)-1)))
-		if idx < 0 {
-			idx = 0
-		}
-		if idx >= len(glyphs) {
-			idx = len(glyphs) - 1
-		}
-		b.WriteRune(glyphs[idx])
-	}
-	return b.String()
 }
 
 func elideMiddle(text string, max int) string {
