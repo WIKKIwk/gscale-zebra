@@ -135,21 +135,47 @@ func SendRaw(device string, payload []byte) error {
 }
 
 func QueryHostStatus(device string, timeout time.Duration) (string, error) {
+	resp, err := transceiveRaw(device, []byte("~HS\n"), timeout)
+	if err != nil {
+		return "", err
+	}
+	return normalizeStatusResponse(resp), nil
+}
+
+func QuerySGDVar(device, key string, timeout time.Duration) (string, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return "", errors.New("key bo'sh")
+	}
+	cmd := fmt.Sprintf("! U1 getvar \"%s\"\r\n", key)
+	resp, err := transceiveRaw(device, []byte(cmd), timeout)
+	if err != nil {
+		return "", err
+	}
+	text := normalizeStatusResponse(resp)
+	text = strings.TrimSpace(strings.Trim(text, "\""))
+	if text == "" {
+		return "", errors.New("bo'sh javob")
+	}
+	return text, nil
+}
+
+func transceiveRaw(device string, payload []byte, timeout time.Duration) ([]byte, error) {
 	if timeout <= 0 {
 		timeout = 1200 * time.Millisecond
 	}
 
 	fd, err := syscall.Open(device, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		if err := SendRaw(device, []byte("~HS\n")); err != nil {
-			return "", err
+		if err := SendRaw(device, payload); err != nil {
+			return nil, err
 		}
-		return "", errors.New("R/W open bo'lmadi; faqat query yuborildi")
+		return nil, errors.New("R/W open bo'lmadi; faqat query yuborildi")
 	}
 	defer syscall.Close(fd)
 
-	if _, err := syscall.Write(fd, []byte("~HS\n")); err != nil {
-		return "", fmt.Errorf("~HS yuborilmadi: %w", err)
+	if _, err := syscall.Write(fd, payload); err != nil {
+		return nil, fmt.Errorf("payload yuborilmadi: %w", err)
 	}
 
 	deadline := time.Now().Add(timeout)
@@ -174,7 +200,7 @@ func QueryHostStatus(device string, timeout time.Duration) (string, error) {
 			if len(resp) > 0 {
 				break
 			}
-			return "", rerr
+			return nil, rerr
 		}
 
 		if n == 0 {
@@ -183,10 +209,9 @@ func QueryHostStatus(device string, timeout time.Duration) (string, error) {
 	}
 
 	if len(resp) == 0 {
-		return "", errors.New("status javobi olinmadi")
+		return nil, errors.New("javob olinmadi")
 	}
-
-	return normalizeStatusResponse(resp), nil
+	return resp, nil
 }
 
 func normalizeStatusResponse(raw []byte) string {

@@ -32,6 +32,10 @@ func main() {
 		if err := runPrintTest(args); err != nil {
 			exitErr(err)
 		}
+	case "epc-test", "rfid-test", "encode":
+		if err := runEPCTest(args); err != nil {
+			exitErr(err)
+		}
 	case "calibrate", "auto-calibrate":
 		if err := runCalibrate(args); err != nil {
 			exitErr(err)
@@ -133,20 +137,82 @@ func runPrintTest(args []string) error {
 		return err
 	}
 
-	zpl := BuildTestLabelZPL(*message, *copies)
+	stream := BuildPrintTestCommandStream(*message, *copies)
 	fmt.Printf("Printer: %s (%s)\n", p.DevicePath, p.DisplayName())
 	fmt.Printf("Action : print-test (copies=%d, dry-run=%v)\n", *copies, *dryRun)
 
 	if *dryRun {
 		fmt.Println("--- ZPL preview ---")
-		fmt.Println(zpl)
+		fmt.Println(stream)
 		return nil
 	}
 
-	if err := SendRaw(p.DevicePath, []byte(zpl)); err != nil {
+	if err := SendRaw(p.DevicePath, []byte(stream)); err != nil {
 		return err
 	}
 	fmt.Println("Test label yuborildi.")
+	return nil
+}
+
+func runEPCTest(args []string) error {
+	fs := flag.NewFlagSet("epc-test", flag.ContinueOnError)
+	device := fs.String("device", "", "printer device path (example: /dev/usb/lp0)")
+	epc := fs.String("epc", "3034257BF7194E4000000001", "EPC hex")
+	feed := fs.Bool("feed", false, "feed label after encode")
+	printHuman := fs.Bool("print-human", false, "print EPC text on label")
+	send := fs.Bool("send", false, "actually send encode command (consumes tag)")
+	timeout := fs.Duration("timeout", 1500*time.Millisecond, "status query timeout")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	p, err := SelectPrinter(*device)
+	if err != nil {
+		return err
+	}
+
+	stream, err := BuildRFIDEncodeCommandStream(*epc, 1, *feed, *printHuman)
+	if err != nil {
+		return err
+	}
+
+	norm, _ := NormalizeEPC(*epc)
+	fmt.Printf("Printer: %s (%s)\n", p.DevicePath, p.DisplayName())
+	fmt.Printf("Action : epc-test (epc=%s, send=%v, feed=%v, print-human=%v)\n", norm, *send, *feed, *printHuman)
+
+	if !*send {
+		fmt.Println("Ogohlantirish: hozircha DRY-RUN. Real yuborish uchun --send qo'shing.")
+		fmt.Println("--- RFID command preview ---")
+		fmt.Println(stream)
+		return nil
+	}
+
+	beforeCount, _ := QuerySGDVar(p.DevicePath, "odometer.total_label_count", *timeout)
+	beforeMedia, _ := QuerySGDVar(p.DevicePath, "media.status", *timeout)
+	beforeDevice, _ := QuerySGDVar(p.DevicePath, "device.status", *timeout)
+
+	if err := SendRaw(p.DevicePath, []byte(stream)); err != nil {
+		return err
+	}
+	time.Sleep(900 * time.Millisecond)
+
+	afterCount, _ := QuerySGDVar(p.DevicePath, "odometer.total_label_count", *timeout)
+	afterMedia, _ := QuerySGDVar(p.DevicePath, "media.status", *timeout)
+	afterDevice, _ := QuerySGDVar(p.DevicePath, "device.status", *timeout)
+	hs, hsErr := QueryHostStatus(p.DevicePath, *timeout)
+
+	fmt.Printf("Before: label_count=%s media=%s device=%s\n", safeStr(beforeCount, "?"), safeStr(beforeMedia, "?"), safeStr(beforeDevice, "?"))
+	fmt.Printf("After : label_count=%s media=%s device=%s\n", safeStr(afterCount, "?"), safeStr(afterMedia, "?"), safeStr(afterDevice, "?"))
+	if hsErr != nil {
+		fmt.Printf("~HS   : no response (%v)\n", hsErr)
+	} else {
+		if len(hs) > 260 {
+			hs = hs[:260] + "..."
+		}
+		fmt.Printf("~HS   : %s\n", strings.ReplaceAll(hs, "\n", " | "))
+	}
+
+	fmt.Println("EPC test command yuborildi.")
 	return nil
 }
 
@@ -210,8 +276,8 @@ func runSelfCheck(args []string) error {
 	}
 
 	if *printOne {
-		zpl := BuildTestLabelZPL("SELF CHECK", 1)
-		if err := SendRaw(p.DevicePath, []byte(zpl)); err != nil {
+		stream := BuildPrintTestCommandStream("SELF CHECK", 1)
+		if err := SendRaw(p.DevicePath, []byte(stream)); err != nil {
 			return fmt.Errorf("self-check print xato: %w", err)
 		}
 		fmt.Println("Self-check print yuborildi (1 label).")
@@ -228,6 +294,7 @@ func printUsage() {
 	fmt.Println("  zebra list")
 	fmt.Println("  zebra status [--device /dev/usb/lp0]")
 	fmt.Println("  zebra print-test [--device /dev/usb/lp0] [--message TEXT] [--copies 1] [--dry-run]")
+	fmt.Println("  zebra epc-test [--device /dev/usb/lp0] [--epc HEX] [--feed] [--print-human] [--send]")
 	fmt.Println("  zebra calibrate [--device /dev/usb/lp0] [--dry-run] [--save=true]")
 	fmt.Println("  zebra self-check [--device /dev/usb/lp0] [--print]")
 }
