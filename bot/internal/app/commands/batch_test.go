@@ -25,3 +25,22 @@ func TestIsInlineButtonUnsupported(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeInlineQuery(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{in: "*", want: ""},
+		{in: " * ", want: ""},
+		{in: "cola", want: "cola"},
+		{in: "  cola  ", want: "cola"},
+		{in: "", want: ""},
+	}
+
+	for _, tc := range cases {
+		if got := normalizeInlineQuery(tc.in); got != tc.want {
+			t.Fatalf("normalizeInlineQuery(%q)=%q want %q", tc.in, got, tc.want)
+		}
+	}
+}
