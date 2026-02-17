@@ -7,42 +7,89 @@ import (
 )
 
 var (
-	weightRegex   = regexp.MustCompile(`([-+]?\d+(?:[.,]\d+)?)\s*(kg|g|lb|lbs|oz)?`)
+	weightRegex   = regexp.MustCompile(`(?i)([-+]?)\s*(\d+(?:[.,]\d+)?)\s*(kg|g|lb|lbs|oz)?\s*([-+]?)`)
 	stableRegex   = regexp.MustCompile(`(?i)\bST\b|\bSTABLE\b`)
 	unstableRegex = regexp.MustCompile(`(?i)\bUS\b|\bUNSTABLE\b`)
 )
 
 func parseWeight(raw, defaultUnit string) (float64, string, *bool, bool) {
-	matches := weightRegex.FindAllStringSubmatch(raw, -1)
+	normalized := normalizeMinus(raw)
+	matches := weightRegex.FindAllStringSubmatch(normalized, -1)
 	if len(matches) == 0 {
 		return 0, "", nil, false
 	}
 
-	m := matches[len(matches)-1]
-	v := strings.ReplaceAll(strings.TrimSpace(m[1]), ",", ".")
-	weight, err := strconv.ParseFloat(v, 64)
+	// 1-pass: unit bor matchlar, 2-pass: unit yo'q matchlar.
+	for pass := 0; pass < 2; pass++ {
+		requireUnit := pass == 0
+		for i := len(matches) - 1; i >= 0; i-- {
+			weight, unit, ok := parseWeightMatch(matches[i], defaultUnit, requireUnit)
+			if !ok {
+				continue
+			}
+
+			var stable *bool
+			if unstableRegex.MatchString(normalized) {
+				v := false
+				stable = &v
+			} else if stableRegex.MatchString(normalized) {
+				v := true
+				stable = &v
+			}
+
+			return weight, unit, stable, true
+		}
+	}
+
+	return 0, "", nil, false
+}
+
+func parseWeightMatch(m []string, defaultUnit string, requireUnit bool) (float64, string, bool) {
+	if len(m) < 5 {
+		return 0, "", false
+	}
+
+	prefixSign := strings.TrimSpace(m[1])
+	numberPart := strings.TrimSpace(m[2])
+	unitPart := strings.ToLower(strings.TrimSpace(m[3]))
+	suffixSign := strings.TrimSpace(m[4])
+
+	if requireUnit && unitPart == "" {
+		return 0, "", false
+	}
+
+	sign := prefixSign
+	if sign == "" && (suffixSign == "-" || suffixSign == "+") {
+		sign = suffixSign
+	}
+
+	numberPart = strings.ReplaceAll(numberPart, ",", ".")
+	if sign == "-" || sign == "+" {
+		numberPart = sign + numberPart
+	}
+
+	weight, err := strconv.ParseFloat(numberPart, 64)
 	if err != nil {
-		return 0, "", nil, false
+		return 0, "", false
 	}
 	if weight < -1_000_000 || weight > 1_000_000 {
-		return 0, "", nil, false
+		return 0, "", false
 	}
 
-	unit := strings.ToLower(strings.TrimSpace(m[2]))
-	if unit == "" {
-		unit = strings.ToLower(strings.TrimSpace(defaultUnit))
+	if unitPart == "" {
+		unitPart = strings.ToLower(strings.TrimSpace(defaultUnit))
 	}
 
-	var stable *bool
-	if unstableRegex.MatchString(raw) {
-		v := false
-		stable = &v
-	} else if stableRegex.MatchString(raw) {
-		v := true
-		stable = &v
-	}
+	return weight, unitPart, true
+}
 
-	return weight, unit, stable, true
+func normalizeMinus(raw string) string {
+	replacer := strings.NewReplacer(
+		"−", "-",
+		"–", "-",
+		"—", "-",
+	)
+	return replacer.Replace(raw)
 }
 
 func appendRaw(existing, chunk string, max int) string {
