@@ -58,3 +58,35 @@ func TestSearchItems(t *testing.T) {
 		t.Fatalf("item[1] mismatch: %+v", items[1])
 	}
 }
+
+func TestSearchItemWarehouses(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "token k:s" {
+			t.Fatalf("auth header mismatch: %q", got)
+		}
+		if r.URL.Path != "/api/resource/Bin" {
+			t.Fatalf("path mismatch: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("filters"); got == "" {
+			t.Fatalf("filters is empty")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"warehouse":"Stores - A","actual_qty":12.5},{"warehouse":"Stores - B","actual_qty":7}]}`))
+	}))
+	defer ts.Close()
+
+	c := New(ts.URL, "k", "s")
+	stocks, err := c.SearchItemWarehouses(context.Background(), "ITM-001", "", 10)
+	if err != nil {
+		t.Fatalf("SearchItemWarehouses error: %v", err)
+	}
+	if len(stocks) != 2 {
+		t.Fatalf("stocks len mismatch: got=%d want=2", len(stocks))
+	}
+	if stocks[0].Warehouse != "Stores - A" || stocks[0].ActualQty != 12.5 {
+		t.Fatalf("stocks[0] mismatch: %+v", stocks[0])
+	}
+	if stocks[1].Warehouse != "Stores - B" || stocks[1].ActualQty != 7 {
+		t.Fatalf("stocks[1] mismatch: %+v", stocks[1])
+	}
+}

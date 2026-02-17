@@ -32,6 +32,13 @@ func HandleBatch(ctx context.Context, deps Deps, msg telegram.Message) error {
 	return err
 }
 
+func HandleInlineQuery(ctx context.Context, deps Deps, q telegram.InlineQuery) error {
+	if request, ok := parseWarehouseInlineQuery(q.Query); ok {
+		return HandleWarehouseInlineQuery(ctx, deps, q, request)
+	}
+	return HandleBatchInlineQuery(ctx, deps, q)
+}
+
 func HandleBatchInlineQuery(ctx context.Context, deps Deps, q telegram.InlineQuery) error {
 	query := normalizeInlineQuery(q.Query)
 	items, err := deps.ERP.SearchItems(ctx, query, 50)

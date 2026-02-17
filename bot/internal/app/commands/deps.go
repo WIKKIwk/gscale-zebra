@@ -17,6 +17,7 @@ type TelegramService interface {
 type ERPService interface {
 	CheckConnection(ctx context.Context) (string, error)
 	SearchItems(ctx context.Context, query string, limit int) ([]erp.Item, error)
+	SearchItemWarehouses(ctx context.Context, itemCode, query string, limit int) ([]erp.WarehouseStock, error)
 }
 
 type Deps struct {

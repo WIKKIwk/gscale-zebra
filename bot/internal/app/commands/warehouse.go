@@ -1,0 +1,166 @@
+package commands
+
+import (
+	"context"
+	"encoding/base64"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"bot/internal/erp"
+	"bot/internal/telegram"
+)
+
+const warehouseInlinePrefix = "wh:"
+
+const warehouseDefaultQuery = "*"
+
+type warehouseQueryRequest struct {
+	ItemCode string
+	Query    string
+}
+
+func ExtractSelectedItemCode(text string) (string, bool) {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	if len(lines) == 0 {
+		return "", false
+	}
+
+	first := strings.TrimSpace(lines[0])
+	if len(first) < len("item:") {
+		return "", false
+	}
+	if !strings.HasPrefix(strings.ToLower(first), "item:") {
+		return "", false
+	}
+
+	code := strings.TrimSpace(first[len("item:"):])
+	if code == "" {
+		return "", false
+	}
+	return code, true
+}
+
+func HandleItemSelected(ctx context.Context, deps Deps, chatID int64, itemCode string) error {
+	itemCode = strings.TrimSpace(itemCode)
+	if itemCode == "" {
+		return nil
+	}
+
+	keyboard := &telegram.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telegram.InlineKeyboardButton{
+			{
+				{Text: "Ombor tanlash", SwitchInlineQueryCurrentChat: buildWarehouseInlineSeed(itemCode)},
+			},
+		},
+	}
+
+	text := fmt.Sprintf("Item tanlandi: %s\nEndi pastdagi tugmani bosib omborni tanlang.", itemCode)
+	err := deps.TG.SendMessageWithInlineKeyboard(ctx, chatID, text, keyboard)
+	if err == nil {
+		return nil
+	}
+
+	if isInlineButtonUnsupported(err) {
+		return deps.TG.SendMessage(ctx, chatID, "Inline mode o'chirilgan. BotFather'da /setinline ni yoqing, keyin /batch ni qayta bering.")
+	}
+
+	return err
+}
+
+func HandleWarehouseInlineQuery(ctx context.Context, deps Deps, q telegram.InlineQuery, request warehouseQueryRequest) error {
+	stocks, err := deps.ERP.SearchItemWarehouses(ctx, request.ItemCode, request.Query, 50)
+	if err != nil {
+		results := []telegram.InlineQueryResultArticle{
+			{
+				Type:        "article",
+				ID:          "erp-wh-error",
+				Title:       "Omborlarni olishda xato",
+				Description: "ERP'dan ombor ro'yxati kelmadi",
+				InputMessageContent: telegram.InputTextMessageContent{
+					MessageText: "Ombor ro'yxatini olib bo'lmadi. Keyinroq qayta urinib ko'ring.",
+				},
+			},
+		}
+		return deps.TG.AnswerInlineQuery(ctx, q.ID, results, 1)
+	}
+
+	results := buildWarehouseResults(request.ItemCode, stocks)
+	if len(results) == 0 {
+		results = []telegram.InlineQueryResultArticle{
+			{
+				Type:        "article",
+				ID:          "wh-empty",
+				Title:       "Ombor topilmadi",
+				Description: "Bu item uchun ombor yo'q yoki qoldiq 0",
+				InputMessageContent: telegram.InputTextMessageContent{
+					MessageText: "Ombor topilmadi",
+				},
+			},
+		}
+	}
+
+	return deps.TG.AnswerInlineQuery(ctx, q.ID, results, 1)
+}
+
+func parseWarehouseInlineQuery(raw string) (warehouseQueryRequest, bool) {
+	q := strings.TrimSpace(raw)
+	if !strings.HasPrefix(q, warehouseInlinePrefix) {
+		return warehouseQueryRequest{}, false
+	}
+
+	payload := strings.TrimSpace(strings.TrimPrefix(q, warehouseInlinePrefix))
+	parts := strings.SplitN(payload, ":", 2)
+	if len(parts) != 2 {
+		return warehouseQueryRequest{}, false
+	}
+
+	encodedCode := strings.TrimSpace(parts[0])
+	if encodedCode == "" {
+		return warehouseQueryRequest{}, false
+	}
+
+	decoded, err := base64.RawURLEncoding.DecodeString(encodedCode)
+	if err != nil {
+		return warehouseQueryRequest{}, false
+	}
+
+	itemCode := strings.TrimSpace(string(decoded))
+	if itemCode == "" {
+		return warehouseQueryRequest{}, false
+	}
+
+	query := strings.TrimSpace(parts[1])
+	if query == warehouseDefaultQuery {
+		query = ""
+	}
+
+	return warehouseQueryRequest{ItemCode: itemCode, Query: query}, true
+}
+
+func buildWarehouseInlineSeed(itemCode string) string {
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(strings.TrimSpace(itemCode)))
+	return warehouseInlinePrefix + encoded + ":" + warehouseDefaultQuery
+}
+
+func buildWarehouseResults(itemCode string, stocks []erp.WarehouseStock) []telegram.InlineQueryResultArticle {
+	results := make([]telegram.InlineQueryResultArticle, 0, len(stocks))
+	for i, stock := range stocks {
+		warehouse := strings.TrimSpace(stock.Warehouse)
+		if warehouse == "" {
+			continue
+		}
+		qtyLabel := strconv.FormatFloat(stock.ActualQty, 'f', 3, 64)
+
+		results = append(results, telegram.InlineQueryResultArticle{
+			Type:        "article",
+			ID:          fmt.Sprintf("wh-%d-%s", i+1, warehouse),
+			Title:       warehouse,
+			Description: "Qoldiq: " + qtyLabel,
+			InputMessageContent: telegram.InputTextMessageContent{
+				MessageText: fmt.Sprintf("Item: %s\nOmbor: %s\nQoldiq: %s", itemCode, warehouse, qtyLabel),
+			},
+		})
+	}
+	return results
+}

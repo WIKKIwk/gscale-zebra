@@ -29,11 +29,23 @@ type Item struct {
 	ItemName string
 }
 
+type WarehouseStock struct {
+	Warehouse string
+	ActualQty float64
+}
+
 type listItemsResponse struct {
 	Data []struct {
 		Name     string `json:"name"`
 		ItemCode string `json:"item_code"`
 		ItemName string `json:"item_name"`
+	} `json:"data"`
+}
+
+type listBinsResponse struct {
+	Data []struct {
+		Warehouse string  `json:"warehouse"`
+		ActualQty float64 `json:"actual_qty"`
 	} `json:"data"`
 }
 
@@ -144,6 +156,78 @@ func (c *Client) SearchItems(ctx context.Context, query string, limit int) ([]It
 	}
 
 	return items, nil
+}
+
+func (c *Client) SearchItemWarehouses(ctx context.Context, itemCode, query string, limit int) ([]WarehouseStock, error) {
+	itemCode = strings.TrimSpace(itemCode)
+	if itemCode == "" {
+		return nil, fmt.Errorf("item code bo'sh")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	q := url.Values{}
+	q.Set("fields", `[`+"\"warehouse\",\"actual_qty\""+`]`)
+	q.Set("limit_page_length", strconv.Itoa(limit))
+	q.Set("order_by", "actual_qty desc")
+
+	filters := [][]interface{}{
+		{"Bin", "item_code", "=", itemCode},
+		{"Bin", "actual_qty", ">", 0},
+	}
+	fb, _ := json.Marshal(filters)
+	q.Set("filters", string(fb))
+
+	query = strings.TrimSpace(query)
+	if query != "" {
+		pattern := "%" + query + "%"
+		orFilters := [][]interface{}{
+			{"Bin", "warehouse", "like", pattern},
+		}
+		ob, _ := json.Marshal(orFilters)
+		q.Set("or_filters", string(ob))
+	}
+
+	endpoint := c.baseURL + "/api/resource/Bin?" + q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.setAuthHeader(req)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("erp bin http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var payload listBinsResponse
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("erp bin json parse xato: %w", err)
+	}
+
+	stocks := make([]WarehouseStock, 0, len(payload.Data))
+	for _, r := range payload.Data {
+		wh := strings.TrimSpace(r.Warehouse)
+		if wh == "" {
+			continue
+		}
+		stocks = append(stocks, WarehouseStock{
+			Warehouse: wh,
+			ActualQty: r.ActualQty,
+		})
+	}
+
+	return stocks, nil
 }
 
 func (c *Client) setAuthHeader(req *http.Request) {

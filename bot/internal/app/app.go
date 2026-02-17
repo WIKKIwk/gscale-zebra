@@ -61,7 +61,7 @@ func (a *App) Run(ctx context.Context) error {
 			}
 
 			if upd.InlineQuery != nil {
-				if err := commands.HandleBatchInlineQuery(ctx, a.deps(), *upd.InlineQuery); err != nil {
+				if err := commands.HandleInlineQuery(ctx, a.deps(), *upd.InlineQuery); err != nil {
 					a.log.Printf("handleInlineQuery error: %v", err)
 				}
 				continue
@@ -83,7 +83,15 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		return nil
 	}
 
+	if itemCode, ok := commands.ExtractSelectedItemCode(text); ok {
+		return commands.HandleItemSelected(ctx, a.deps(), msg.Chat.ID, itemCode)
+	}
+
 	cmd := normalizeCommand(text)
+	if cmd == "" {
+		return nil
+	}
+
 	a.maybeDeleteCommandMessage(ctx, msg, cmd)
 
 	switch cmd {
@@ -157,6 +165,9 @@ func normalizeCommand(text string) string {
 		return ""
 	}
 	cmd := strings.ToLower(parts[0])
+	if !strings.HasPrefix(cmd, "/") {
+		return ""
+	}
 	if i := strings.Index(cmd, "@"); i > 0 {
 		cmd = cmd[:i]
 	}
