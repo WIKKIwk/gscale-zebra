@@ -56,7 +56,7 @@ func BuildRFIDEncodeCommandStream(epc string, copies int, feedAfter bool, printH
 	var b strings.Builder
 	b.WriteString("~PS\n") // resume printing
 	b.WriteString("^XA\n")
-	if feedAfter && !printHuman {
+	if feedAfter {
 		b.WriteString("^MMT\n")
 	}
 	b.WriteString("^RS8,,,1,N\n")
@@ -67,7 +67,7 @@ func BuildRFIDEncodeCommandStream(epc string, copies int, feedAfter bool, printH
 	}
 	b.WriteString(fmt.Sprintf("^PQ%d\n", copies))
 	b.WriteString("^XZ\n")
-	if feedAfter && !printHuman {
+	if feedAfter {
 		b.WriteString("~PH\n")
 	}
 	return b.String(), nil

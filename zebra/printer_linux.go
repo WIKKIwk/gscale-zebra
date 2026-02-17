@@ -118,18 +118,36 @@ func SendRaw(device string, payload []byte) error {
 		return errors.New("payload bo'sh")
 	}
 
-	f, err := os.OpenFile(device, os.O_WRONLY, 0)
+	fd, err := syscall.Open(device, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return fmt.Errorf("device ochilmadi: %w", err)
 	}
-	defer f.Close()
+	defer syscall.Close(fd)
 
-	n, err := f.Write(payload)
-	if err != nil {
-		return fmt.Errorf("yozib bo'lmadi: %w", err)
-	}
-	if n != len(payload) {
-		return fmt.Errorf("to'liq yozilmadi: %d/%d", n, len(payload))
+	deadline := time.Now().Add(2 * time.Second)
+	written := 0
+	for written < len(payload) {
+		n, werr := syscall.Write(fd, payload[written:])
+		if n > 0 {
+			written += n
+		}
+		if werr != nil {
+			errNo, ok := werr.(syscall.Errno)
+			if ok && (errNo == syscall.EAGAIN || errNo == syscall.EWOULDBLOCK) {
+				if time.Now().After(deadline) {
+					return fmt.Errorf("yozib bo'lmadi: timeout (%w)", werr)
+				}
+				time.Sleep(25 * time.Millisecond)
+				continue
+			}
+			return fmt.Errorf("yozib bo'lmadi: %w", werr)
+		}
+		if n == 0 {
+			if time.Now().After(deadline) {
+				return fmt.Errorf("yozib bo'lmadi: timeout")
+			}
+			time.Sleep(25 * time.Millisecond)
+		}
 	}
 	return nil
 }
@@ -174,7 +192,7 @@ func transceiveRaw(device string, payload []byte, timeout time.Duration) ([]byte
 	}
 	defer syscall.Close(fd)
 
-	if _, err := syscall.Write(fd, payload); err != nil {
+	if err := writeFDNonBlocking(fd, payload, time.Now().Add(timeout)); err != nil {
 		return nil, fmt.Errorf("payload yuborilmadi: %w", err)
 	}
 
@@ -212,6 +230,34 @@ func transceiveRaw(device string, payload []byte, timeout time.Duration) ([]byte
 		return nil, errors.New("javob olinmadi")
 	}
 	return resp, nil
+}
+
+func writeFDNonBlocking(fd int, payload []byte, deadline time.Time) error {
+	off := 0
+	for off < len(payload) {
+		n, err := syscall.Write(fd, payload[off:])
+		if n > 0 {
+			off += n
+		}
+		if err != nil {
+			errNo, ok := err.(syscall.Errno)
+			if ok && (errNo == syscall.EAGAIN || errNo == syscall.EWOULDBLOCK) {
+				if time.Now().After(deadline) {
+					return fmt.Errorf("timeout: %w", err)
+				}
+				time.Sleep(20 * time.Millisecond)
+				continue
+			}
+			return err
+		}
+		if n == 0 {
+			if time.Now().After(deadline) {
+				return errors.New("timeout")
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	return nil
 }
 
 func normalizeStatusResponse(raw []byte) string {

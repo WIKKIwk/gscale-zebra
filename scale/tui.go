@@ -239,6 +239,15 @@ func (m tuiModel) View() string {
 	read2 := safeText("-", m.zebra.ReadLine2)
 	verify := safeText("-", m.zebra.Verify)
 	lastEPC := safeText("-", m.zebra.LastEPC)
+	attempts := m.zebra.Attempts
+	if attempts <= 0 {
+		attempts = 1
+	}
+	autoTune := "NO"
+	if m.zebra.AutoTuned {
+		autoTune = "YES"
+	}
+	note := safeText("-", m.zebra.Note)
 	zebraUpdated := "-"
 	if !m.zebra.UpdatedAt.IsZero() {
 		zebraUpdated = m.zebra.UpdatedAt.Format("15:04:05.000")
@@ -254,6 +263,9 @@ func (m tuiModel) View() string {
 		"Read line1: " + elideMiddle(read1, 40),
 		"Read line2: " + elideMiddle(read2, 40),
 		"Verify: " + strings.ToUpper(verify),
+		fmt.Sprintf("Attempts: %d", attempts),
+		"Auto tune: " + autoTune,
+		"Note: " + elideMiddle(note, 40),
 		"Last EPC: " + elideMiddle(lastEPC, 40),
 		"Updated: " + zebraUpdated,
 		"Error: " + elideMiddle(zebraErr, 40),
@@ -336,8 +348,16 @@ func zebraActionSummary(st ZebraStatus) string {
 	if strings.TrimSpace(st.Error) != "" {
 		return fmt.Sprintf("zebra %s xato: %s", strings.ToLower(a), st.Error)
 	}
+	auto := "no"
+	if st.AutoTuned {
+		auto = "yes"
+	}
+	attempts := st.Attempts
+	if attempts <= 0 {
+		attempts = 1
+	}
 	if a == "ENCODE" {
-		return fmt.Sprintf("zebra encode: epc=%s verify=%s line1=%s", safeText("-", st.LastEPC), safeText("UNKNOWN", st.Verify), safeText("-", st.ReadLine1))
+		return fmt.Sprintf("zebra encode: epc=%s verify=%s attempts=%d autotune=%s line1=%s", safeText("-", st.LastEPC), safeText("UNKNOWN", st.Verify), attempts, auto, safeText("-", st.ReadLine1))
 	}
 	if a == "READ" {
 		return fmt.Sprintf("zebra read: verify=%s line1=%s", safeText("UNKNOWN", st.Verify), safeText("-", st.ReadLine1))
