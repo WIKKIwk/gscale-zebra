@@ -71,9 +71,9 @@ func collectZebraStatus(preferredDevice string, timeout time.Duration) ZebraStat
 	st.Name = p.DisplayName()
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
-	st.ReadLine1 = safeText("-", queryVarRetry(p.DevicePath, "rfid.tag.read.result_line1", timeout, 2, 80*time.Millisecond))
-	st.ReadLine2 = safeText("-", queryVarRetry(p.DevicePath, "rfid.tag.read.result_line2", timeout, 2, 80*time.Millisecond))
-	st.Verify = inferVerify(st.ReadLine1, st.ReadLine2, "")
+	st.ReadLine1 = "-"
+	st.ReadLine2 = "-"
+	st.Verify = "-"
 	return st
 }
 
@@ -137,21 +137,6 @@ func runZebraEncodeAndRead(preferredDevice, epc string, timeout time.Duration) Z
 	st.ReadLine2 = safeText("-", line2)
 	st.Verify = verify
 
-	if shouldAutoTune(verify) {
-		st.AutoTuned = true
-		st.Attempts = 2
-		st.Note = runAutoTuneSequence(p.DevicePath)
-
-		line1, line2, verify, err = encodeAndVerify(p.DevicePath, norm, timeout)
-		if err != nil {
-			st.Error = err.Error()
-		} else {
-			st.ReadLine1 = safeText("-", line1)
-			st.ReadLine2 = safeText("-", line2)
-			st.Verify = verify
-		}
-	}
-
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
 	if st.Verify != "MATCH" && strings.TrimSpace(st.Error) == "" {
@@ -170,7 +155,7 @@ func encodeAndVerify(device, epc string, timeout time.Duration) (string, string,
 	}
 	time.Sleep(820 * time.Millisecond)
 
-	line1, line2, verify := readbackRFIDResult(device, epc, timeout, 5)
+	line1, line2, verify := readbackRFIDResult(device, epc, timeout, 1)
 	return line1, line2, verify, nil
 }
 
@@ -331,8 +316,8 @@ func isBusyLikeError(err error) bool {
 func applyZebraSnapshot(st *ZebraStatus, p ZebraPrinter, timeout time.Duration) {
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
-	st.ReadLine1 = safeText("-", queryVarRetry(p.DevicePath, "rfid.tag.read.result_line1", timeout, 2, 80*time.Millisecond))
-	st.ReadLine2 = safeText("-", queryVarRetry(p.DevicePath, "rfid.tag.read.result_line2", timeout, 2, 80*time.Millisecond))
+	st.ReadLine1 = "-"
+	st.ReadLine2 = "-"
 }
 
 func publishZebraStatus(ch chan<- ZebraStatus, st ZebraStatus) {
@@ -356,12 +341,9 @@ func buildRFIDEncodeCommand(epc string) (string, error) {
 		return "", err
 	}
 	return "^XA\n" +
-		"^MMT\n" +
-		"^PW560\n" +
-		"^LL260\n" +
 		"^RS8,,,1,N\n" +
 		fmt.Sprintf("^RFW,H,,,A^FD%s^FS\n", norm) +
-		"^FO28,24^A0N,32,32\n" +
+		"^FO28,24^A0N,30,30\n" +
 		fmt.Sprintf("^FD%s^FS\n", norm) +
 		"^PQ1\n" +
 		"^XZ\n", nil
