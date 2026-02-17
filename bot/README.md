@@ -1,6 +1,6 @@
 # bot
 
-Telegram bot (`/start`) orqali ERPNext ulanishini tekshiradi.
+Telegram bot (`/start`, `/batch`) orqali ERPNext bilan ishlaydi.
 
 ## Ishga tushirish
 
@@ -11,8 +11,17 @@ cp .env.example .env
 go run ./cmd/bot
 ```
 
-## Hozirgi vazifa
+## Buyruqlar
 
-- `/start` kelganda ERPNext API bilan auth tekshiradi.
-- Muvaffaqiyatli bo'lsa foydalanuvchiga `ERPNext ga ulandi` degan xabar yuboradi.
-- Xato bo'lsa xato matnini yuboradi.
+- `/start`
+  - ERPNext API auth tekshiradi.
+  - Ulangan bo'lsa `ERPNext ga ulandi` xabarini yuboradi.
+
+- `/batch`
+  - `Item tanlang:` xabarini inline tugma bilan yuboradi.
+  - Tugma bosilganda current chat'da Telegram inline menu ochiladi.
+  - Inline query natijalarida ERPNext'dagi itemlar chiqadi.
+
+## Eslatma
+
+Inline menu ishlashi uchun botda inline mode yoqilgan bo'lishi kerak (`@BotFather` -> `/setinline`).

@@ -2,11 +2,11 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strings"
 	"time"
 
+	"bot/internal/app/commands"
 	"bot/internal/config"
 	"bot/internal/erp"
 	"bot/internal/telegram"
@@ -31,6 +31,10 @@ func New(cfg config.Config, logger *log.Logger) *App {
 	}
 }
 
+func (a *App) deps() commands.Deps {
+	return commands.Deps{TG: a.tg, ERP: a.erp}
+}
+
 func (a *App) Run(ctx context.Context) error {
 	a.log.Printf("bot started, ERP=%s", a.cfg.ERPURL)
 	var offset int64 = 0
@@ -53,6 +57,14 @@ func (a *App) Run(ctx context.Context) error {
 			if upd.UpdateID >= offset {
 				offset = upd.UpdateID + 1
 			}
+
+			if upd.InlineQuery != nil {
+				if err := commands.HandleBatchInlineQuery(ctx, a.deps(), *upd.InlineQuery); err != nil {
+					a.log.Printf("handleInlineQuery error: %v", err)
+				}
+				continue
+			}
+
 			if upd.Message == nil {
 				continue
 			}
@@ -69,13 +81,24 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		return nil
 	}
 
-	if strings.HasPrefix(strings.ToLower(text), "/start") {
-		user, err := a.erp.CheckConnection(ctx)
-		if err != nil {
-			return a.tg.SendMessage(ctx, msg.Chat.ID, "ERPNext ulanishi xato: "+err.Error())
-		}
-		return a.tg.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ERPNext ga ulandi. User: %s", user))
+	switch normalizeCommand(text) {
+	case "/start":
+		return commands.HandleStart(ctx, a.deps(), msg)
+	case "/batch":
+		return commands.HandleBatch(ctx, a.deps(), msg)
+	default:
+		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch")
 	}
+}
 
-	return a.tg.SendMessage(ctx, msg.Chat.ID, "Hozircha faqat /start buyrug'i qo'llanadi.")
+func normalizeCommand(text string) string {
+	parts := strings.Fields(strings.TrimSpace(text))
+	if len(parts) == 0 {
+		return ""
+	}
+	cmd := strings.ToLower(parts[0])
+	if i := strings.Index(cmd, "@"); i > 0 {
+		cmd = cmd[:i]
+	}
+	return cmd
 }
