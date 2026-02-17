@@ -30,7 +30,7 @@ func parseFlags() (appConfig, error) {
 	flag.StringVar(&cfg.unit, "unit", "kg", "default unit")
 	flag.DurationVar(&cfg.probeTimeout, "probe-timeout", 800*time.Millisecond, "probe duration per port/baud")
 	flag.StringVar(&cfg.bridgeURL, "bridge-url", "http://127.0.0.1:18000/api/v1/scale", "fallback HTTP endpoint")
-	flag.DurationVar(&cfg.bridgeInterval, "bridge-interval", 250*time.Millisecond, "bridge poll interval")
+	flag.DurationVar(&cfg.bridgeInterval, "bridge-interval", 120*time.Millisecond, "bridge poll interval")
 	flag.BoolVar(&cfg.disableBridge, "no-bridge", false, "disable HTTP bridge fallback")
 	flag.Parse()
 
