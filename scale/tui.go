@@ -182,7 +182,7 @@ func (m tuiModel) View() string {
 		lag = fmt.Sprintf("%d ms", d.Milliseconds())
 	}
 
-	leftW, rightW := panelWidths(w)
+	panelW := w
 
 	zebraDisabled := strings.EqualFold(strings.TrimSpace(m.zebra.Error), "disabled")
 	zebraConnected := m.zebra.Connected && strings.TrimSpace(m.zebra.Error) == "" && !zebraDisabled
@@ -218,36 +218,27 @@ func (m tuiModel) View() string {
 		kv("STABLE", strings.ToUpper(stableText(m.last.Stable))),
 		kv("UPDATED", updated),
 		kv("LAG", lag),
-		kv("SOURCE", elideMiddle(m.sourceLine, maxInt(20, leftW-16))),
-		kv("PORT", elideMiddle(port, maxInt(20, leftW-16))),
+		kv("SOURCE", elideMiddle(m.sourceLine, maxInt(20, panelW-16))),
+		kv("PORT", elideMiddle(port, maxInt(20, panelW-16))),
 	}
 
 	zebraLines := []string{
 		kv("STATUS", zebraState),
-		kv("PRINTER", elideMiddle(zebraName, maxInt(18, rightW-16))),
-		kv("DEVICE", elideMiddle(zebraDevice, maxInt(18, rightW-16))),
+		kv("PRINTER", elideMiddle(zebraName, maxInt(18, panelW-16))),
+		kv("DEVICE", elideMiddle(zebraDevice, maxInt(18, panelW-16))),
 		kv("DEVICE ST", deviceState),
 		kv("MEDIA ST", mediaState),
 		kv("VERIFY", verify),
-		kv("LAST EPC", elideMiddle(lastEPC, maxInt(18, rightW-16))),
-		kv("READ", elideMiddle(read1, maxInt(18, rightW-16))),
+		kv("LAST EPC", elideMiddle(lastEPC, maxInt(18, panelW-16))),
+		kv("READ", elideMiddle(read1, maxInt(18, panelW-16))),
 		kv("UPDATED", zebraUpdated),
-		kv("ERROR", elideMiddle(zebraErr, maxInt(18, rightW-16))),
+		kv("ERROR", elideMiddle(zebraErr, maxInt(18, panelW-16))),
 	}
 
 	header := renderHeader(w, now, scaleState, zebraState)
-	scalePanel := renderUnixPanel("SCALE MONITOR", scaleLines, leftW)
-	zebraPanel := renderUnixPanel("ZEBRA MONITOR", zebraLines, rightW)
-
-	body := scalePanel
-	if w >= 110 {
-		body = joinHorizontalPanels(scalePanel, zebraPanel, leftW, rightW)
-	} else {
-		body = scalePanel + "\n" + zebraPanel
-	}
-
+	panel := renderUnifiedPanel("GSCALE-ZEBRA MONITOR", "SCALE", scaleLines, "ZEBRA", zebraLines, panelW)
 	footer := renderFooter(w, m.info)
-	return header + "\n" + body + "\n" + footer
+	return header + "\n" + panel + "\n" + footer
 }
 
 func waitForReadingCmd(ctx context.Context, updates <-chan Reading) tea.Cmd {
@@ -380,6 +371,26 @@ func renderFooter(width int, info string) string {
 		text = left
 	}
 	return fitLineRaw(text, width)
+}
+
+func renderUnifiedPanel(title, scaleTitle string, scaleLines []string, zebraTitle string, zebraLines []string, width int) string {
+	if width < 68 {
+		width = 68
+	}
+	inner := width - 2
+	rows := make([]string, 0, len(scaleLines)+len(zebraLines)+6)
+	rows = append(rows, "┌"+centerTitle(title, inner)+"┐")
+	rows = append(rows, "│"+fitPanelLine("["+strings.ToUpper(strings.TrimSpace(scaleTitle))+"]", inner)+"│")
+	for _, line := range scaleLines {
+		rows = append(rows, "│"+fitPanelLine(line, inner)+"│")
+	}
+	rows = append(rows, "├"+strings.Repeat("─", inner)+"┤")
+	rows = append(rows, "│"+fitPanelLine("["+strings.ToUpper(strings.TrimSpace(zebraTitle))+"]", inner)+"│")
+	for _, line := range zebraLines {
+		rows = append(rows, "│"+fitPanelLine(line, inner)+"│")
+	}
+	rows = append(rows, "└"+strings.Repeat("─", inner)+"┘")
+	return strings.Join(rows, "\n")
 }
 
 func renderUnixPanel(title string, lines []string, width int) string {
