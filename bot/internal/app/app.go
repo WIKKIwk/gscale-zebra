@@ -24,6 +24,7 @@ type App struct {
 	batchPromptMsgByChat     map[int64]int64
 	warehousePromptMsgByChat map[int64]int64
 	selectionByChat          map[int64]SelectedContext
+	batchChangeMsgByChat     map[int64]int64
 
 	batchMu     sync.Mutex
 	batchNextID int64
@@ -55,6 +56,7 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		batchPromptMsgByChat:     make(map[int64]int64),
 		warehousePromptMsgByChat: make(map[int64]int64),
 		selectionByChat:          make(map[int64]SelectedContext),
+		batchChangeMsgByChat:     make(map[int64]int64),
 		batchByChat:              make(map[int64]batchSession),
 	}
 }
