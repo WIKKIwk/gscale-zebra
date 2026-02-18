@@ -11,7 +11,7 @@ import (
 
 const inlineDefaultQuery = "*"
 
-func HandleBatch(ctx context.Context, deps Deps, msg telegram.Message) error {
+func HandleBatch(ctx context.Context, deps Deps, msg telegram.Message) (int64, error) {
 	keyboard := &telegram.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telegram.InlineKeyboardButton{
 			{
@@ -20,16 +20,16 @@ func HandleBatch(ctx context.Context, deps Deps, msg telegram.Message) error {
 		},
 	}
 
-	err := deps.TG.SendMessageWithInlineKeyboard(ctx, msg.Chat.ID, "Item tanlang:", keyboard)
+	messageID, err := deps.TG.SendMessageWithInlineKeyboardAndReturnID(ctx, msg.Chat.ID, "Item tanlang:", keyboard)
 	if err == nil {
-		return nil
+		return messageID, nil
 	}
 
 	if isInlineButtonUnsupported(err) {
-		return deps.TG.SendMessage(ctx, msg.Chat.ID, "Inline mode o'chirilgan. BotFather'da /setinline ni yoqing, keyin /batch ni qayta bering.")
+		return 0, deps.TG.SendMessage(ctx, msg.Chat.ID, "Inline mode o'chirilgan. BotFather'da /setinline ni yoqing, keyin /batch ni qayta bering.")
 	}
 
-	return err
+	return 0, err
 }
 
 func HandleInlineQuery(ctx context.Context, deps Deps, q telegram.InlineQuery) error {

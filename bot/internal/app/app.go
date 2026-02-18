@@ -13,11 +13,12 @@ import (
 )
 
 type App struct {
-	cfg                config.Config
-	tg                 *telegram.Client
-	erp                *erp.Client
-	log                *log.Logger
-	startInfoMsgByChat map[int64]int64
+	cfg                  config.Config
+	tg                   *telegram.Client
+	erp                  *erp.Client
+	log                  *log.Logger
+	startInfoMsgByChat   map[int64]int64
+	batchPromptMsgByChat map[int64]int64
 }
 
 func New(cfg config.Config, logger *log.Logger) *App {
@@ -25,11 +26,12 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		logger = log.Default()
 	}
 	return &App{
-		cfg:                cfg,
-		tg:                 telegram.New(cfg.TelegramBotToken),
-		erp:                erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
-		log:                logger,
-		startInfoMsgByChat: make(map[int64]int64),
+		cfg:                  cfg,
+		tg:                   telegram.New(cfg.TelegramBotToken),
+		erp:                  erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
+		log:                  logger,
+		startInfoMsgByChat:   make(map[int64]int64),
+		batchPromptMsgByChat: make(map[int64]int64),
 	}
 }
 
@@ -95,7 +97,12 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 	}
 
 	if itemCode, ok := commands.ExtractSelectedItemCode(text); ok {
-		return commands.HandleItemSelected(ctx, a.deps(), msg.Chat.ID, itemCode)
+		if err := commands.HandleItemSelected(ctx, a.deps(), msg.Chat.ID, itemCode); err != nil {
+			return err
+		}
+		a.deleteTrackedBatchPromptMessage(ctx, msg.Chat.ID)
+		a.deleteMessageBestEffort(ctx, msg.Chat.ID, msg.MessageID, "delete selected-item warning")
+		return nil
 	}
 
 	cmd := normalizeCommand(text)
@@ -114,9 +121,11 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		a.trackStartInfoMessage(ctx, msg.Chat.ID, messageID)
 		return nil
 	case "/batch":
-		if err := commands.HandleBatch(ctx, a.deps(), msg); err != nil {
+		messageID, err := commands.HandleBatch(ctx, a.deps(), msg)
+		if err != nil {
 			return err
 		}
+		a.trackBatchPromptMessage(ctx, msg.Chat.ID, messageID)
 		a.deleteTrackedStartInfoMessage(ctx, msg.Chat.ID)
 		return nil
 	default:
@@ -130,9 +139,7 @@ func (a *App) trackStartInfoMessage(ctx context.Context, chatID, messageID int64
 	}
 
 	if prev := a.startInfoMsgByChat[chatID]; prev > 0 && prev != messageID {
-		if err := a.tg.DeleteMessage(ctx, chatID, prev); err != nil {
-			a.log.Printf("delete old start-info warning: %v", err)
-		}
+		a.deleteMessageBestEffort(ctx, chatID, prev, "delete old start-info warning")
 	}
 	a.startInfoMsgByChat[chatID] = messageID
 }
@@ -142,10 +149,28 @@ func (a *App) deleteTrackedStartInfoMessage(ctx context.Context, chatID int64) {
 	if messageID <= 0 {
 		return
 	}
-	if err := a.tg.DeleteMessage(ctx, chatID, messageID); err != nil {
-		a.log.Printf("delete start-info warning: %v", err)
-	}
+	a.deleteMessageBestEffort(ctx, chatID, messageID, "delete start-info warning")
 	delete(a.startInfoMsgByChat, chatID)
+}
+
+func (a *App) trackBatchPromptMessage(ctx context.Context, chatID, messageID int64) {
+	if messageID <= 0 {
+		return
+	}
+
+	if prev := a.batchPromptMsgByChat[chatID]; prev > 0 && prev != messageID {
+		a.deleteMessageBestEffort(ctx, chatID, prev, "delete old batch-prompt warning")
+	}
+	a.batchPromptMsgByChat[chatID] = messageID
+}
+
+func (a *App) deleteTrackedBatchPromptMessage(ctx context.Context, chatID int64) {
+	messageID := a.batchPromptMsgByChat[chatID]
+	if messageID <= 0 {
+		return
+	}
+	a.deleteMessageBestEffort(ctx, chatID, messageID, "delete batch-prompt warning")
+	delete(a.batchPromptMsgByChat, chatID)
 }
 
 func (a *App) maybeDeleteCommandMessage(ctx context.Context, msg telegram.Message, cmd string) {
@@ -156,8 +181,15 @@ func (a *App) maybeDeleteCommandMessage(ctx context.Context, msg telegram.Messag
 		return
 	}
 
-	if err := a.tg.DeleteMessage(ctx, msg.Chat.ID, msg.MessageID); err != nil {
-		a.log.Printf("deleteMessage warning: %v", err)
+	a.deleteMessageBestEffort(ctx, msg.Chat.ID, msg.MessageID, "deleteMessage warning")
+}
+
+func (a *App) deleteMessageBestEffort(ctx context.Context, chatID, messageID int64, logPrefix string) {
+	if messageID <= 0 {
+		return
+	}
+	if err := a.tg.DeleteMessage(ctx, chatID, messageID); err != nil {
+		a.log.Printf("%s: %v", logPrefix, err)
 	}
 }
 
