@@ -24,6 +24,8 @@ func (a *App) handleCallbackQuery(ctx context.Context, q telegram.CallbackQuery)
 		return nil
 	case commands.StockEntryCallbackBatchChangeItem:
 		return a.handleBatchChangeItemCallback(ctx, q)
+	case commands.StockEntryCallbackBatchStart:
+		return a.handleBatchStartCallback(ctx, q)
 	case commands.StockEntryCallbackBatchStop:
 		return a.handleBatchStopCallback(ctx, q)
 	default:
@@ -90,13 +92,35 @@ func (a *App) handleBatchStopCallback(ctx context.Context, q telegram.CallbackQu
 			return err
 		}
 		stoppedText := formatStoppedStatus(q.Message.Text)
-		if err := a.tg.EditMessageText(ctx, chatID, q.Message.MessageID, stoppedText, nil); err != nil && !isMessageNotModifiedError(err) {
+		if err := a.tg.EditMessageText(ctx, chatID, q.Message.MessageID, stoppedText, commands.BuildBatchControlKeyboard()); err != nil && !isMessageNotModifiedError(err) {
 			a.log.Printf("edit stopped status warning: %v", err)
 		}
 		return nil
 	}
 
-	return a.tg.AnswerCallbackQuery(ctx, q.ID, "Aktiv batch yo'q")
+	return a.tg.AnswerCallbackQuery(ctx, q.ID, "Batch allaqachon to'xtagan")
+}
+
+func (a *App) handleBatchStartCallback(ctx context.Context, q telegram.CallbackQuery) error {
+	if q.Message == nil || q.Message.Chat.ID == 0 {
+		return a.tg.AnswerCallbackQuery(ctx, q.ID, "Batch boshlandi")
+	}
+
+	chatID := q.Message.Chat.ID
+	sel, ok := a.getSelection(chatID)
+	if !ok {
+		if err := a.tg.AnswerCallbackQuery(ctx, q.ID, "Avval item va ombor tanlang"); err != nil {
+			return err
+		}
+		return a.tg.SendMessage(ctx, chatID, "Avval /batch orqali item va ombor tanlang.")
+	}
+	if a.hasBatchSession(chatID) {
+		return a.tg.AnswerCallbackQuery(ctx, q.ID, "Batch allaqachon ishlayapti")
+	}
+
+	a.clearBatchChangePending(chatID)
+	_ = a.startMaterialIssueBatch(ctx, chatID, sel, q.Message.MessageID, "Batch qayta boshlandi: scale qty kutilmoqda...")
+	return a.tg.AnswerCallbackQuery(ctx, q.ID, "Batch qayta boshlandi")
 }
 
 func (a *App) startMaterialIssueBatch(ctx context.Context, chatID int64, sel SelectedContext, statusMessageID int64, note string) int64 {

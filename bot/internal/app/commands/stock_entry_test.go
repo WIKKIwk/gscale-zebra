@@ -45,13 +45,16 @@ func TestExtractSelectedWarehouse(t *testing.T) {
 
 func TestBuildBatchControlKeyboard(t *testing.T) {
 	kb := BuildBatchControlKeyboard()
-	if kb == nil || len(kb.InlineKeyboard) != 1 || len(kb.InlineKeyboard[0]) != 2 {
+	if kb == nil || len(kb.InlineKeyboard) != 1 || len(kb.InlineKeyboard[0]) != 3 {
 		t.Fatalf("unexpected keyboard shape: %+v", kb)
 	}
 	if kb.InlineKeyboard[0][0].CallbackData != StockEntryCallbackBatchChangeItem {
 		t.Fatalf("change callback mismatch: %q", kb.InlineKeyboard[0][0].CallbackData)
 	}
-	if kb.InlineKeyboard[0][1].CallbackData != StockEntryCallbackBatchStop {
-		t.Fatalf("stop callback mismatch: %q", kb.InlineKeyboard[0][1].CallbackData)
+	if kb.InlineKeyboard[0][1].CallbackData != StockEntryCallbackBatchStart {
+		t.Fatalf("start callback mismatch: %q", kb.InlineKeyboard[0][1].CallbackData)
+	}
+	if kb.InlineKeyboard[0][2].CallbackData != StockEntryCallbackBatchStop {
+		t.Fatalf("stop callback mismatch: %q", kb.InlineKeyboard[0][2].CallbackData)
 	}
 }

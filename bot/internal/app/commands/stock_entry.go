@@ -11,6 +11,7 @@ import (
 const StockEntryCallbackMaterialIssue = "stock:material_issue"
 const StockEntryCallbackReceipt = "stock:receipt"
 const StockEntryCallbackBatchChangeItem = "stock:batch_change_item"
+const StockEntryCallbackBatchStart = "stock:batch_start"
 const StockEntryCallbackBatchStop = "stock:batch_stop"
 
 func ExtractSelectedWarehouse(text string) (string, string, bool) {
@@ -69,6 +70,7 @@ func BuildBatchControlKeyboard() *telegram.InlineKeyboardMarkup {
 		InlineKeyboard: [][]telegram.InlineKeyboardButton{
 			{
 				{Text: "Item almashtirish", CallbackData: StockEntryCallbackBatchChangeItem},
+				{Text: "Batch Start", CallbackData: StockEntryCallbackBatchStart},
 				{Text: "Batch Stop", CallbackData: StockEntryCallbackBatchStop},
 			},
 		},

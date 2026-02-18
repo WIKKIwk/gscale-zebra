@@ -53,6 +53,16 @@ func (a *App) stopBatchSession(chatID int64) bool {
 	return false
 }
 
+func (a *App) hasBatchSession(chatID int64) bool {
+	if chatID == 0 {
+		return false
+	}
+	a.batchMu.Lock()
+	_, ok := a.batchByChat[chatID]
+	a.batchMu.Unlock()
+	return ok
+}
+
 func (a *App) stopAllBatchSessions() {
 	a.batchMu.Lock()
 	cancels := make([]context.CancelFunc, 0, len(a.batchByChat))
