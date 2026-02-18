@@ -10,6 +10,7 @@ import (
 	"bot/internal/bridgeclient"
 	"bot/internal/config"
 	"bot/internal/erp"
+	"bot/internal/labelprint"
 	"bot/internal/telegram"
 )
 
@@ -19,12 +20,14 @@ type App struct {
 	erp                      *erp.Client
 	qtyReader                *bridgeclient.Client
 	batchState               *batchstate.Store
+	imagePrinter             *labelprint.Service
 	log                      *log.Logger
 	startInfoMsgByChat       map[int64]int64
 	batchPromptMsgByChat     map[int64]int64
 	warehousePromptMsgByChat map[int64]int64
 	selectionByChat          map[int64]SelectedContext
 	batchChangeMsgByChat     map[int64]int64
+	imageAwaitByChat         map[int64]bool
 
 	batchMu     sync.Mutex
 	batchNextID int64
@@ -51,12 +54,14 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		erp:                      erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
 		qtyReader:                bridgeclient.New(cfg.BridgeStateFile),
 		batchState:               batchstate.New(cfg.BridgeStateFile),
+		imagePrinter:             labelprint.New(cfg.PrinterDevice, cfg.LabelWidthDots, cfg.LabelHeightDots),
 		log:                      logger,
 		startInfoMsgByChat:       make(map[int64]int64),
 		batchPromptMsgByChat:     make(map[int64]int64),
 		warehousePromptMsgByChat: make(map[int64]int64),
 		selectionByChat:          make(map[int64]SelectedContext),
 		batchChangeMsgByChat:     make(map[int64]int64),
+		imageAwaitByChat:         make(map[int64]bool),
 		batchByChat:              make(map[int64]batchSession),
 	}
 }

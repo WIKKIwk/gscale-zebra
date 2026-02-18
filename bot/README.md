@@ -1,6 +1,6 @@
 # bot
 
-Telegram bot (`/start`, `/batch`) orqali ERPNext bilan ishlaydi.
+Telegram bot (`/start`, `/batch`, `/image`) orqali ERPNext va Zebra bilan ishlaydi.
 
 ## Ishga tushirish
 
@@ -22,6 +22,10 @@ go run ./cmd/bot
   - Tugma bosilganda current chat'da Telegram inline menu ochiladi.
   - Inline query natijalarida ERPNext'dagi itemlar chiqadi.
 
+- `/image`
+  - `Rasm tashlang.` xabarini yuboradi.
+  - User rasm yuborsa, bot rasmni label o'lchamiga sig'dirib Zebra printerga chiqaradi.
+
 ## Bridge state
 
 Bot batch session holatini shared bridge faylga yozadi:
@@ -31,6 +35,12 @@ Bot batch session holatini shared bridge faylga yozadi:
 
 `Material Issue` bosilganda `batch.active=true`, `Batch Stop` bosilganda `batch.active=false` bo'ladi.
 Scale TUI shu holatga qarab auto printni yoqadi/o'chiradi.
+
+## Printer sozlamalari (`/image`)
+
+- `PRINTER_DEVICE` default: `/dev/usb/lp0`
+- `LABEL_WIDTH_DOTS` default: `560`
+- `LABEL_HEIGHT_DOTS` default: `320`
 
 ## Eslatma
 

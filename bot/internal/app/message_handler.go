@@ -9,9 +9,17 @@ import (
 )
 
 func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
+	if len(msg.Photo) > 0 {
+		return a.handleIncomingPhoto(ctx, msg)
+	}
+
 	text := strings.TrimSpace(msg.Text)
 	if text == "" {
 		return nil
+	}
+
+	if a.isImageAwaiting(msg.Chat.ID) && !strings.HasPrefix(strings.TrimSpace(text), "/") {
+		return a.tg.SendMessage(ctx, msg.Chat.ID, "Rasm kutilyapti. Iltimos, rasm yuboring.")
 	}
 
 	if itemCode, warehouse, ok := commands.ExtractSelectedWarehouse(text); ok {
@@ -53,6 +61,7 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 
 	switch cmd {
 	case "/start":
+		a.setImageAwaiting(msg.Chat.ID, false)
 		messageID, err := commands.HandleStart(ctx, a.deps(), msg)
 		if err != nil {
 			return err
@@ -60,6 +69,7 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		a.trackStartInfoMessage(ctx, msg.Chat.ID, messageID)
 		return nil
 	case "/batch":
+		a.setImageAwaiting(msg.Chat.ID, false)
 		messageID, err := commands.HandleBatch(ctx, a.deps(), msg)
 		if err != nil {
 			return err
@@ -70,8 +80,12 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		a.clearBatchChangePending(msg.Chat.ID)
 		a.clearSelection(msg.Chat.ID)
 		return nil
+	case "/image":
+		a.setImageAwaiting(msg.Chat.ID, true)
+		_, err := commands.HandleImage(ctx, a.deps(), msg)
+		return err
 	default:
-		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch")
+		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch, /image")
 	}
 }
 
@@ -88,7 +102,7 @@ func (a *App) maybeDeleteCommandMessage(ctx context.Context, msg telegram.Messag
 
 func shouldDeleteUserCommand(cmd string) bool {
 	switch cmd {
-	case "/start", "/batch":
+	case "/start", "/batch", "/image":
 		return true
 	default:
 		return false
