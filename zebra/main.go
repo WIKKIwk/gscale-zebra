@@ -25,6 +25,10 @@ func main() {
 		if err := runStatus(args); err != nil {
 			exitErr(err)
 		}
+	case "settings", "config":
+		if err := runSettings(args); err != nil {
+			exitErr(err)
+		}
 	case "print-test":
 		if err := runPrintTest(args); err != nil {
 			exitErr(err)

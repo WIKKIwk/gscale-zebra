@@ -55,14 +55,17 @@ func BuildRFIDEncodeCommandStream(epc string, copies int, feedAfter bool, printH
 
 	var b strings.Builder
 	b.WriteString("^XA\n")
+	b.WriteString("^PW560\n")
+	b.WriteString("^LL260\n")
+	b.WriteString("^LH0,0\n")
 	if feedAfter {
 		b.WriteString("^MMT\n")
 	}
 	b.WriteString("^RS8,,,1,N\n")
 	b.WriteString(fmt.Sprintf("^RFW,H,,,A^FD%s^FS\n", norm))
 	if printHuman {
-		b.WriteString("^FO28,24^A0N,30,30\n")
-		b.WriteString(fmt.Sprintf("^FD%s^FS\n", norm))
+		b.WriteString("^FO20,24^A0N,22,22^FB520,2,0,L,0\n")
+		b.WriteString(fmt.Sprintf("^FDEPC: %s^FS\n", sanitizeZPLText(norm)))
 	}
 	b.WriteString(fmt.Sprintf("^PQ%d\n", copies))
 	b.WriteString("^XZ\n")
@@ -115,8 +118,8 @@ func sanitizeZPLText(v string) string {
 		"\r", " ",
 	)
 	v = replacer.Replace(v)
-	if len(v) > 80 {
-		v = v[:80]
+	if len(v) > 120 {
+		v = v[:120]
 	}
 	return v
 }
