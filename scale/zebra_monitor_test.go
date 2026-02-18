@@ -78,6 +78,28 @@ func TestGenerateTestEPC_LengthAndUniq(t *testing.T) {
 	}
 }
 
+func TestParseRFIDCounter(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int64
+		ok   bool
+	}{
+		{"382", 382, true},
+		{" 74 ", 74, true},
+		{"\"12\"", 12, true},
+		{"", 0, false},
+		{"?", 0, false},
+		{"abc", 0, false},
+	}
+
+	for _, tc := range cases {
+		got, ok := parseRFIDCounter(tc.in)
+		if ok != tc.ok || got != tc.want {
+			t.Fatalf("parseRFIDCounter(%q) = (%d,%v), want (%d,%v)", tc.in, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
 func isUpperHexScale(v string) bool {
 	for _, ch := range v {
 		if strings.ContainsRune("0123456789ABCDEF", ch) {

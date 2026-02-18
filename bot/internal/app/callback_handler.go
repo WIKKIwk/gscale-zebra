@@ -232,7 +232,7 @@ func formatRFIDConfirmLine(epc, verify string) string {
 		verify = "UNKNOWN"
 	}
 	confirmed := "YO'Q"
-	if strings.TrimSpace(epc) != "" && verify == "MATCH" {
+	if strings.TrimSpace(epc) != "" && (verify == "MATCH" || verify == "WRITTEN") {
 		confirmed = "HA"
 	}
 	return fmt.Sprintf("RFID temirga yozildi: %s (VERIFY=%s)", confirmed, verify)
