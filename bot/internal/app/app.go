@@ -1,7 +1,9 @@
 package app
 
 import (
+	"context"
 	"log"
+	"sync"
 
 	"bot/internal/app/commands"
 	"bot/internal/config"
@@ -20,6 +22,15 @@ type App struct {
 	batchPromptMsgByChat     map[int64]int64
 	warehousePromptMsgByChat map[int64]int64
 	selectionByChat          map[int64]SelectedContext
+
+	batchMu     sync.Mutex
+	batchNextID int64
+	batchByChat map[int64]batchSession
+}
+
+type batchSession struct {
+	id     int64
+	cancel context.CancelFunc
 }
 
 type SelectedContext struct {
@@ -41,6 +52,7 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		batchPromptMsgByChat:     make(map[int64]int64),
 		warehousePromptMsgByChat: make(map[int64]int64),
 		selectionByChat:          make(map[int64]SelectedContext),
+		batchByChat:              make(map[int64]batchSession),
 	}
 }
 

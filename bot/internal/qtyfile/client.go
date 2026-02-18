@@ -94,6 +94,45 @@ func (c *Client) WaitStablePositive(ctx context.Context, timeout, pollInterval t
 	}
 }
 
+func (c *Client) WaitForReset(ctx context.Context, timeout, pollInterval time.Duration) error {
+	if c == nil || strings.TrimSpace(c.path) == "" {
+		return fmt.Errorf("qty file path bo'sh")
+	}
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+	if pollInterval <= 0 {
+		pollInterval = 220 * time.Millisecond
+	}
+
+	deadline := time.Now().Add(timeout)
+	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("scale reset timeout (%s)", timeout)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		s, err := c.readSnapshot()
+		if err != nil {
+			time.Sleep(pollInterval)
+			continue
+		}
+		if !isFreshSnapshot(s.UpdatedAt, 4*time.Second) {
+			time.Sleep(pollInterval)
+			continue
+		}
+		if s.Weight == nil || *s.Weight <= 0 {
+			return nil
+		}
+
+		time.Sleep(pollInterval)
+	}
+}
+
 func (c *Client) readSnapshot() (snapshot, error) {
 	b, err := os.ReadFile(c.path)
 	if err != nil {

@@ -43,3 +43,17 @@ func TestWaitStablePositive_Timeout(t *testing.T) {
 		t.Fatalf("expected timeout error")
 	}
 }
+
+func TestWaitForReset(t *testing.T) {
+	d := t.TempDir()
+	p := filepath.Join(d, "qty.json")
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if err := os.WriteFile(p, []byte(`{"weight":0,"unit":"kg","stable":false,"updated_at":"`+now+`"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(p)
+	if err := c.WaitForReset(context.Background(), 500*time.Millisecond, 50*time.Millisecond); err != nil {
+		t.Fatalf("WaitForReset error: %v", err)
+	}
+}

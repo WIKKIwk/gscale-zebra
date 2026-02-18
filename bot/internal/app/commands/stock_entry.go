@@ -10,6 +10,7 @@ import (
 
 const StockEntryCallbackMaterialIssue = "stock:material_issue"
 const StockEntryCallbackReceipt = "stock:receipt"
+const StockEntryCallbackBatchStop = "stock:batch_stop"
 
 func ExtractSelectedWarehouse(text string) (string, string, bool) {
 	lines := strings.Split(strings.TrimSpace(text), "\n")
@@ -56,4 +57,14 @@ func HandleWarehouseSelected(ctx context.Context, deps Deps, chatID int64, itemC
 
 	text := fmt.Sprintf("Item tanlandi: %s\nOmbor tanlandi: %s\nStock entry tanlang:", itemCode, warehouse)
 	return deps.TG.SendMessageWithInlineKeyboard(ctx, chatID, text, keyboard)
+}
+
+func BuildBatchStopKeyboard() *telegram.InlineKeyboardMarkup {
+	return &telegram.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telegram.InlineKeyboardButton{
+			{
+				{Text: "Batch Stop", CallbackData: StockEntryCallbackBatchStop},
+			},
+		},
+	}
 }
