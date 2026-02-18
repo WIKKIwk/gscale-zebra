@@ -58,6 +58,9 @@ func TestGenerateTestEPC_LengthAndUniq(t *testing.T) {
 	if a == b {
 		t.Fatalf("expected unique epc for same tick: %s", a)
 	}
+	if strings.HasSuffix(a, "00000000") || strings.HasSuffix(b, "00000000") {
+		t.Fatalf("epc tail should not be all-zero: a=%s b=%s", a, b)
+	}
 	if !isUpperHexScale(a) || !isUpperHexScale(b) {
 		t.Fatalf("epc must be uppercase hex: a=%s b=%s", a, b)
 	}

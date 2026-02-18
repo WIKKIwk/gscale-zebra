@@ -1,8 +1,12 @@
 package core
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math"
+	"math/bits"
+	"os"
 	"time"
 )
 
@@ -30,6 +34,7 @@ type StableEPCDetector struct {
 
 	lastNS int64
 	seq    uint32
+	salt   uint32
 }
 
 func NewStableEPCDetector(cfg StableEPCConfig) *StableEPCDetector {
@@ -42,7 +47,7 @@ func NewStableEPCDetector(cfg StableEPCConfig) *StableEPCDetector {
 	if cfg.MinWeight < 0 {
 		cfg.MinWeight = 0
 	}
-	return &StableEPCDetector{cfg: cfg}
+	return &StableEPCDetector{cfg: cfg, salt: newEPCSalt()}
 }
 
 func (d *StableEPCDetector) Observe(weight *float64, at time.Time) (string, bool) {
@@ -95,7 +100,7 @@ func (d *StableEPCDetector) reset() {
 }
 
 // nextEPC24 returns a 24-char uppercase hex EPC-like id:
-// 30 + 14 hex chars (unix ns low 56-bit) + 8 hex chars (sequence).
+// 30 + 14 hex chars (unix ns low 56-bit) + 8 hex chars (time-atom mix tail).
 func (d *StableEPCDetector) nextEPC24(t time.Time) string {
 	ns := t.UnixNano()
 	if ns != d.lastNS {
@@ -104,5 +109,21 @@ func (d *StableEPCDetector) nextEPC24(t time.Time) string {
 	} else {
 		d.seq++
 	}
-	return fmt.Sprintf("30%014X%08X", uint64(ns)&0x00FFFFFFFFFFFFFF, d.seq)
+	return formatEPC24(ns, d.seq, d.salt)
+}
+
+func formatEPC24(ns int64, seq, salt uint32) string {
+	atom := uint32((uint64(ns) / 1_000) & 0xFFFFFFFF)
+	tail := atom ^ bits.RotateLeft32(uint32(ns), 13) ^ bits.RotateLeft32(seq, 7) ^ salt
+	tail |= 1
+	return fmt.Sprintf("30%014X%08X", uint64(ns)&0x00FFFFFFFFFFFFFF, tail)
+}
+
+func newEPCSalt() uint32 {
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err == nil {
+		return binary.BigEndian.Uint32(b[:]) | 1
+	}
+	fallback := uint32(time.Now().UnixNano()) ^ (uint32(os.Getpid()) << 16)
+	return fallback | 1
 }

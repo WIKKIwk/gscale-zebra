@@ -22,6 +22,9 @@ func TestNextEPC24_LengthAndUniq(t *testing.T) {
 	if a == b {
 		t.Fatalf("epc should be unique on same ns tick: %s", a)
 	}
+	if strings.HasSuffix(a, "00000000") || strings.HasSuffix(b, "00000000") {
+		t.Fatalf("epc tail should not be all-zero: a=%s b=%s", a, b)
+	}
 	if !isUpperHex(a) || !isUpperHex(b) {
 		t.Fatalf("epc must be uppercase hex: a=%s b=%s", a, b)
 	}
