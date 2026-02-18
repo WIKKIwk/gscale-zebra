@@ -167,7 +167,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			}
 		}
 		if strings.TrimSpace(epc) == "" || epcVerify != "MATCH" {
-			note := "RFID yozuvi tasdiqlanmadi"
+			note := "RFID yozilmadi"
 			if strings.TrimSpace(epc) == "" {
 				note = note + " (EPC olinmadi)"
 			} else {

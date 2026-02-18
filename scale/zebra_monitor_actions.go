@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-const (
-	maxEncodeAttempts = 1
-	readVerifyRetries = 1
-)
-
 func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
 	zebraIOMutex.Lock()
 	defer zebraIOMutex.Unlock()
@@ -88,44 +83,22 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 }
 
 func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duration) (string, string, string, int, bool, error) {
-	attempts := 0
-	autoTuned := false
-	lastLine1, lastLine2, lastVerify := "", "", "UNKNOWN"
+	const attempts = 1
+	const autoTuned = false
 
-	for i := 0; i < maxEncodeAttempts; i++ {
-		attempts++
-		stream, err := buildRFIDEncodeCommand(epc, qtyText, itemName)
-		if err != nil {
-			return "", "", "UNKNOWN", attempts, autoTuned, err
-		}
-		if err := sendRawRetry(device, []byte(stream), 18, 140*time.Millisecond); err != nil {
-			if isBusyLikeError(err) {
-				return "", "", "UNKNOWN", attempts, autoTuned, fmt.Errorf("%w (printer busy: boshqa process /dev/usb/lp0 ni band qilgan)", err)
-			}
-			return "", "", "UNKNOWN", attempts, autoTuned, err
-		}
-		time.Sleep(820 * time.Millisecond)
-
-		line1, line2, verify := readbackRFIDResult(device, epc, timeout, readVerifyRetries)
-		lastLine1, lastLine2, lastVerify = line1, line2, verify
-		if verify == "MATCH" {
-			return line1, line2, verify, attempts, autoTuned, nil
-		}
-
-		if i == maxEncodeAttempts-1 {
-			break
-		}
-
-		if shouldAutoTune(verify) || verify == "MISMATCH" {
-			note := runAutoTuneSequence(device)
-			if strings.TrimSpace(note) != "" {
-				autoTuned = true
-			}
-		}
-		waitReady(device, 1800*time.Millisecond)
+	stream, err := buildRFIDEncodeCommand(epc, qtyText, itemName)
+	if err != nil {
+		return "", "", "UNKNOWN", attempts, autoTuned, err
 	}
-
-	return lastLine1, lastLine2, lastVerify, attempts, autoTuned, nil
+	if err := sendRawRetry(device, []byte(stream), 8, 120*time.Millisecond); err != nil {
+		if isBusyLikeError(err) {
+			return "", "", "UNKNOWN", attempts, autoTuned, fmt.Errorf("%w (printer busy: boshqa process /dev/usb/lp0 ni band qilgan)", err)
+		}
+		return "", "", "UNKNOWN", attempts, autoTuned, err
+	}
+	time.Sleep(820 * time.Millisecond)
+	line1, line2, verify := readbackRFIDResult(device, epc, timeout, 1)
+	return line1, line2, verify, attempts, autoTuned, nil
 }
 
 func readbackRFIDResult(device, expected string, timeout time.Duration, retries int) (string, string, string) {
