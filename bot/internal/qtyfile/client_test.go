@@ -44,7 +44,7 @@ func TestWaitStablePositive_Timeout(t *testing.T) {
 	}
 }
 
-func TestWaitForReset(t *testing.T) {
+func TestWaitForNextCycle_ByReset(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "qty.json")
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -53,7 +53,21 @@ func TestWaitForReset(t *testing.T) {
 	}
 
 	c := New(p)
-	if err := c.WaitForReset(context.Background(), 500*time.Millisecond, 50*time.Millisecond); err != nil {
-		t.Fatalf("WaitForReset error: %v", err)
+	if err := c.WaitForNextCycle(context.Background(), 500*time.Millisecond, 50*time.Millisecond, 1.0); err != nil {
+		t.Fatalf("WaitForNextCycle reset error: %v", err)
+	}
+}
+
+func TestWaitForNextCycle_ByChange(t *testing.T) {
+	d := t.TempDir()
+	p := filepath.Join(d, "qty.json")
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if err := os.WriteFile(p, []byte(`{"weight":1.500,"unit":"kg","stable":true,"updated_at":"`+now+`"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(p)
+	if err := c.WaitForNextCycle(context.Background(), 500*time.Millisecond, 50*time.Millisecond, 1.000); err != nil {
+		t.Fatalf("WaitForNextCycle change error: %v", err)
 	}
 }

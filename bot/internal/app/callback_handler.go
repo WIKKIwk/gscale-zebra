@@ -104,14 +104,14 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 		statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, unit, "Batch davom etmoqda"))
 
 		for {
-			err := a.qtyReader.WaitForReset(ctx, 10*time.Minute, 220*time.Millisecond)
+			err := a.qtyReader.WaitForNextCycle(ctx, 10*time.Minute, 220*time.Millisecond, draft.Qty)
 			if err == nil {
 				break
 			}
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
-			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, unit, "Mahsulotni olib tashlang (0 kg)"))
+			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, unit, "Keyingi mahsulotni qo'ying (yoki 0 kg)"))
 		}
 	}
 }

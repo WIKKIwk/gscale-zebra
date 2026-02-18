@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const minNextQtyDelta = 0.005
+
 type Client struct {
 	path string
 }
@@ -94,7 +96,10 @@ func (c *Client) WaitStablePositive(ctx context.Context, timeout, pollInterval t
 	}
 }
 
-func (c *Client) WaitForReset(ctx context.Context, timeout, pollInterval time.Duration) error {
+// WaitForNextCycle returns when scale goes to reset (<=0) OR weight changes enough
+// from last processed qty. This prevents batch from getting stuck when operator
+// replaces product without hitting exact zero.
+func (c *Client) WaitForNextCycle(ctx context.Context, timeout, pollInterval time.Duration, lastQty float64) error {
 	if c == nil || strings.TrimSpace(c.path) == "" {
 		return fmt.Errorf("qty file path bo'sh")
 	}
@@ -108,7 +113,7 @@ func (c *Client) WaitForReset(ctx context.Context, timeout, pollInterval time.Du
 	deadline := time.Now().Add(timeout)
 	for {
 		if time.Now().After(deadline) {
-			return fmt.Errorf("scale reset timeout (%s)", timeout)
+			return fmt.Errorf("scale next-cycle timeout (%s)", timeout)
 		}
 		select {
 		case <-ctx.Done():
@@ -126,6 +131,9 @@ func (c *Client) WaitForReset(ctx context.Context, timeout, pollInterval time.Du
 			continue
 		}
 		if s.Weight == nil || *s.Weight <= 0 {
+			return nil
+		}
+		if math.Abs(*s.Weight-lastQty) >= minNextQtyDelta {
 			return nil
 		}
 
