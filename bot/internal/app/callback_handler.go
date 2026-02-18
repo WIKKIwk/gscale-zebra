@@ -166,13 +166,8 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 				epcVerify = "UNKNOWN"
 			}
 		}
-		if strings.TrimSpace(epc) == "" || epcVerify != "MATCH" {
-			note := "RFID yozilmadi"
-			if strings.TrimSpace(epc) == "" {
-				note = note + " (EPC olinmadi)"
-			} else {
-				note = note + " (VERIFY=" + epcVerify + ")"
-			}
+		if strings.TrimSpace(epc) == "" {
+			note := "RFID yozilmadi (EPC olinmadi)"
 			if strings.TrimSpace(epcNote) != "" {
 				note = note + " | " + strings.TrimSpace(epcNote)
 			}
@@ -201,7 +196,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			lastEPC = epc
 		}
 
-		note := "Batch davom etmoqda"
+		note := "Batch davom etmoqda | RFID yozish buyrug'i yuborildi"
 		if strings.TrimSpace(epcNote) != "" {
 			note = note + " | EPC ogohlantirish: " + strings.TrimSpace(epcNote)
 		}
@@ -273,11 +268,10 @@ func formatRFIDConfirmLine(epc, verify string) string {
 	if verify == "" {
 		verify = "UNKNOWN"
 	}
-	confirmed := "YO'Q"
-	if strings.TrimSpace(epc) != "" && verify == "MATCH" {
-		confirmed = "HA"
+	if strings.TrimSpace(epc) == "" {
+		return fmt.Sprintf("RFID holat: EPC yo'q (VERIFY=%s)", verify)
 	}
-	return fmt.Sprintf("RFID temirga yozildi: %s (VERIFY=%s)", confirmed, verify)
+	return fmt.Sprintf("RFID holat: yozish yuborildi (VERIFY=%s)", verify)
 }
 
 func formatSelectedItem(sel SelectedContext) string {

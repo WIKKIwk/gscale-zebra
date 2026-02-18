@@ -11,6 +11,9 @@ func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildRFIDEncodeCommand error: %v", err)
 	}
+	if !strings.HasPrefix(stream, "~PS\n^XA\n") {
+		t.Fatalf("stream must start with resume+format: %q", stream)
+	}
 
 	if !strings.Contains(stream, "^RFW,H,,,A^FD3034ABCDEF1234567890AA^FS") {
 		t.Fatalf("rfid write command not found in stream: %s", stream)
