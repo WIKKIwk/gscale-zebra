@@ -100,7 +100,7 @@ func (a *App) handleBatchStopCallback(ctx context.Context, q telegram.CallbackQu
 }
 
 func (a *App) startMaterialIssueBatch(ctx context.Context, chatID int64, sel SelectedContext, statusMessageID int64, note string) int64 {
-	initial := formatBatchStatusText(sel, 0, "", 0, "", "", strings.TrimSpace(note))
+	initial := formatBatchStatusText(sel, 0, "", 0, "", "", "", strings.TrimSpace(note))
 	statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, initial)
 
 	a.startBatchSession(ctx, chatID, func(batchCtx context.Context) {
@@ -122,18 +122,25 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			if strings.Contains(strings.ToLower(err.Error()), "timeout") {
 				continue
 			}
-			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", "", "Scale xato: "+err.Error()))
+			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", "", "", "Scale xato: "+err.Error()))
 			continue
 		}
 
 		epc := ""
+		epcVerify := "UNKNOWN"
 		epcNote := ""
-		epc, err = a.qtyReader.WaitEPCForReading(ctx, 6*time.Second, 140*time.Millisecond, reading.UpdatedAt, lastEPC)
+		epcReading, err := a.qtyReader.WaitEPCForReading(ctx, 6*time.Second, 140*time.Millisecond, reading.UpdatedAt, lastEPC)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
 			epcNote = err.Error()
+		} else {
+			epc = strings.ToUpper(strings.TrimSpace(epcReading.EPC))
+			epcVerify = strings.ToUpper(strings.TrimSpace(epcReading.Verify))
+			if epcVerify == "" {
+				epcVerify = "UNKNOWN"
+			}
 		}
 
 		draft, err := a.erp.CreateMaterialIssueDraft(ctx, erp.MaterialIssueDraftInput{
@@ -143,7 +150,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			Barcode:   epc,
 		})
 		if err != nil {
-			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", epc, "ERP xato: "+err.Error()))
+			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", epc, epcVerify, "ERP xato: "+err.Error()))
 			continue
 		}
 
@@ -156,7 +163,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 		if strings.TrimSpace(epcNote) != "" {
 			note = note + " | EPC ogohlantirish: " + strings.TrimSpace(epcNote)
 		}
-		statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, reading.Unit, epc, note))
+		statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, reading.Unit, epc, epcVerify, note))
 
 		for {
 			err := a.qtyReader.WaitForNextCycle(ctx, 10*time.Minute, 220*time.Millisecond, draft.Qty)
@@ -166,7 +173,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
-			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, reading.Unit, epc, "Keyingi mahsulotni qo'ying (yoki 0 kg)"))
+			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, reading.Unit, epc, epcVerify, "Keyingi mahsulotni qo'ying (yoki 0 kg)"))
 		}
 	}
 }
@@ -188,7 +195,7 @@ func (a *App) upsertBatchStatusMessage(ctx context.Context, chatID, messageID in
 	return newID
 }
 
-func formatBatchStatusText(sel SelectedContext, draftCount int, draftName string, qty float64, unit, epc, note string) string {
+func formatBatchStatusText(sel SelectedContext, draftCount int, draftName string, qty float64, unit, epc, epcVerify, note string) string {
 	lines := []string{
 		"Batch ishlayapti",
 		fmt.Sprintf("Item: %s", formatSelectedItem(sel)),
@@ -208,6 +215,7 @@ func formatBatchStatusText(sel SelectedContext, draftCount int, draftName string
 			epc = "-"
 		}
 		lines = append(lines, "Oxirgi EPC: "+epc)
+		lines = append(lines, formatRFIDConfirmLine(epc, epcVerify))
 	}
 
 	note = strings.TrimSpace(note)
@@ -216,6 +224,18 @@ func formatBatchStatusText(sel SelectedContext, draftCount int, draftName string
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func formatRFIDConfirmLine(epc, verify string) string {
+	verify = strings.ToUpper(strings.TrimSpace(verify))
+	if verify == "" {
+		verify = "UNKNOWN"
+	}
+	confirmed := "YO'Q"
+	if strings.TrimSpace(epc) != "" && verify == "MATCH" {
+		confirmed = "HA"
+	}
+	return fmt.Sprintf("RFID temirga yozildi: %s (VERIFY=%s)", confirmed, verify)
 }
 
 func formatSelectedItem(sel SelectedContext) string {

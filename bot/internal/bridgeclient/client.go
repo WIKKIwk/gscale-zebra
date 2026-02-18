@@ -21,6 +21,14 @@ type StableReading struct {
 	UpdatedAt time.Time
 }
 
+type EPCReading struct {
+	EPC       string
+	Verify    string
+	ReadLine1 string
+	ReadLine2 string
+	UpdatedAt time.Time
+}
+
 func New(path string) *Client {
 	return &Client{store: bridgestate.New(path)}
 }
@@ -103,9 +111,9 @@ func (c *Client) WaitStablePositiveReading(ctx context.Context, timeout, pollInt
 	}
 }
 
-func (c *Client) WaitEPCForReading(ctx context.Context, timeout, pollInterval time.Duration, after time.Time, lastEPC string) (string, error) {
+func (c *Client) WaitEPCForReading(ctx context.Context, timeout, pollInterval time.Duration, after time.Time, lastEPC string) (EPCReading, error) {
 	if c == nil || c.store == nil || strings.TrimSpace(c.store.Path()) == "" {
-		return "", fmt.Errorf("bridge state path bo'sh")
+		return EPCReading{}, fmt.Errorf("bridge state path bo'sh")
 	}
 	if timeout <= 0 {
 		timeout = 6 * time.Second
@@ -118,11 +126,11 @@ func (c *Client) WaitEPCForReading(ctx context.Context, timeout, pollInterval ti
 	deadline := time.Now().Add(timeout)
 	for {
 		if time.Now().After(deadline) {
-			return "", fmt.Errorf("epc timeout (%s)", timeout)
+			return EPCReading{}, fmt.Errorf("epc timeout (%s)", timeout)
 		}
 		select {
 		case <-ctx.Done():
-			return "", ctx.Err()
+			return EPCReading{}, ctx.Err()
 		default:
 		}
 
@@ -150,7 +158,18 @@ func (c *Client) WaitEPCForReading(ctx context.Context, timeout, pollInterval ti
 			}
 		}
 
-		return epc, nil
+		verify := strings.ToUpper(strings.TrimSpace(snap.Zebra.Verify))
+		if verify == "" {
+			verify = "UNKNOWN"
+		}
+
+		return EPCReading{
+			EPC:       epc,
+			Verify:    verify,
+			ReadLine1: strings.TrimSpace(snap.Zebra.ReadLine1),
+			ReadLine2: strings.TrimSpace(snap.Zebra.ReadLine2),
+			UpdatedAt: epcAt,
+		}, nil
 	}
 }
 

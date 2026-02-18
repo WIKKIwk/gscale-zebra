@@ -44,17 +44,25 @@ func TestWaitEPCForReading(t *testing.T) {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if err := s.Update(func(snapshot *bridgestate.Snapshot) {
 		snapshot.Zebra.LastEPC = "3034257BF7194E406994036B"
+		snapshot.Zebra.Verify = "MATCH"
+		snapshot.Zebra.ReadLine1 = "ok"
 		snapshot.Zebra.UpdatedAt = now
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	c := New(p)
-	epc, err := c.WaitEPCForReading(context.Background(), 500*time.Millisecond, 50*time.Millisecond, time.Now().Add(-1*time.Second), "")
+	got, err := c.WaitEPCForReading(context.Background(), 500*time.Millisecond, 50*time.Millisecond, time.Now().Add(-1*time.Second), "")
 	if err != nil {
 		t.Fatalf("WaitEPCForReading error: %v", err)
 	}
-	if epc != "3034257BF7194E406994036B" {
-		t.Fatalf("epc mismatch: %q", epc)
+	if got.EPC != "3034257BF7194E406994036B" {
+		t.Fatalf("epc mismatch: %q", got.EPC)
+	}
+	if got.Verify != "MATCH" {
+		t.Fatalf("verify mismatch: %q", got.Verify)
+	}
+	if got.ReadLine1 != "ok" {
+		t.Fatalf("read line mismatch: %q", got.ReadLine1)
 	}
 }
