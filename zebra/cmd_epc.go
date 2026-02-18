@@ -15,6 +15,11 @@ func runEPCTest(args []string) error {
 	feed := fs.Bool("feed", true, "feed label after encode")
 	printHuman := fs.Bool("print-human", true, "print EPC text on label")
 	autoTune := fs.Bool("auto-tune", true, "auto calibrate and retry on NO TAG")
+	profileInit := fs.Bool("profile-init", true, "set RFID profile before encode")
+	labelTries := fs.Int("label-tries", 1, "rfid.label_tries (1..10)")
+	errorHandling := fs.String("error-handling", "none", "rfid.error_handling: none|pause|error")
+	readPower := fs.Int("read-power", 30, "RFID read power (0..30)")
+	writePower := fs.Int("write-power", 30, "RFID write power (0..30)")
 	send := fs.Bool("send", false, "actually send encode command (consumes tag)")
 	timeout := fs.Duration("timeout", 1500*time.Millisecond, "status query timeout")
 	if err := fs.Parse(args); err != nil {
@@ -34,13 +39,23 @@ func runEPCTest(args []string) error {
 
 	norm, _ := NormalizeEPC(*epc)
 	fmt.Printf("Printer: %s (%s)\n", p.DevicePath, p.DisplayName())
-	fmt.Printf("Action : epc-test (epc=%s, send=%v, feed=%v, print-human=%v, auto-tune=%v)\n", norm, *send, *feed, *printHuman, *autoTune)
+	fmt.Printf("Action : epc-test (epc=%s, send=%v, feed=%v, print-human=%v, auto-tune=%v, profile-init=%v)\n", norm, *send, *feed, *printHuman, *autoTune, *profileInit)
 
 	if !*send {
 		fmt.Println("Ogohlantirish: hozircha DRY-RUN. Real yuborish uchun --send qo'shing.")
 		fmt.Println("--- RFID command preview ---")
 		fmt.Println(stream)
 		return nil
+	}
+
+	if *profileInit {
+		opt := defaultRFIDProfileOptions()
+		opt.LabelTries = *labelTries
+		opt.ErrorHandling = *errorHandling
+		opt.ReadPower = *readPower
+		opt.WritePower = *writePower
+		profile := applyRFIDProfile(p.DevicePath, *timeout, opt)
+		fmt.Printf("Profile: %s\n", profile)
 	}
 
 	beforeCount := queryVarRetry(p.DevicePath, "odometer.total_label_count", *timeout, 4, 120*time.Millisecond)

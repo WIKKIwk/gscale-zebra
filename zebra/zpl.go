@@ -25,6 +25,7 @@ func BuildTestLabelZPL(message string, copies int) string {
 	now := time.Now().Format("2006-01-02 15:04:05")
 
 	var b strings.Builder
+	b.WriteString("~PS\n")
 	b.WriteString("^XA\n")
 	b.WriteString("^LH0,0\n")
 	b.WriteString("^MMT\n")
