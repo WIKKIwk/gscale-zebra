@@ -10,7 +10,7 @@ DC_ENV := SCALE_DEVICE=$(SCALE_DEVICE) ZEBRA_DEVICE=$(ZEBRA_DEVICE)
 
 help:
 	@echo "Targets:"
-	@echo "  make run       - docker orqali scale TUI + bot parallel (TUI attach)"
+	@echo "  make run       - eskisini o'chirib, cache'siz qayta build va run (TUI attach)"
 	@echo "  make run-bg    - stackni backgroundda ishga tushirish"
 	@echo "  make build     - image build"
 	@echo "  make down      - containerlarni to'xtatish/o'chirish"
@@ -32,7 +32,9 @@ run: check-env
 	@set -e; \
 	cleanup() { $(COMPOSE) stop bot >/dev/null 2>&1 || true; }; \
 	trap cleanup EXIT INT TERM; \
-	$(DC_ENV) $(COMPOSE) up -d --build --no-deps bot; \
+	$(COMPOSE) down --remove-orphans >/dev/null 2>&1 || true; \
+	$(DC_ENV) $(COMPOSE) build --no-cache; \
+	$(DC_ENV) $(COMPOSE) up -d --no-deps --force-recreate bot; \
 	$(DC_ENV) $(COMPOSE) run --rm --no-deps --service-ports scale
 
 run-bg: check-env
