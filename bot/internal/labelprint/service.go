@@ -15,6 +15,9 @@ const defaultPrinterDevice = "/dev/usb/lp0"
 const defaultLabelWidthDots = 560
 const defaultLabelHeightDots = 320
 const printerGlobalLockPath = "/tmp/gscale-zebra/zebra.lock"
+const printerTraceDir = "/tmp/gscale-zebra"
+const printerTraceLogPath = "/tmp/gscale-zebra/bot_image_print.log"
+const printerTraceZPLPath = "/tmp/gscale-zebra/last_image_print.zpl"
 
 type Service struct {
 	devicePath  string
@@ -43,22 +46,37 @@ func New(devicePath string, labelWidth, labelHeight int) *Service {
 
 func (s *Service) PrintImageBytes(ctx context.Context, imageBytes []byte) error {
 	if len(imageBytes) == 0 {
-		return fmt.Errorf("rasm bo'sh")
+		err := fmt.Errorf("rasm bo'sh")
+		tracePrint("reject-empty-image", s.devicePath, 0, err)
+		return err
 	}
 
 	img, _, err := decodeImage(imageBytes)
 	if err != nil {
-		return fmt.Errorf("rasm decode qilinmadi: %w", err)
+		err = fmt.Errorf("rasm decode qilinmadi: %w", err)
+		tracePrint("decode-error", s.devicePath, len(imageBytes), err)
+		return err
 	}
 
 	zpl, err := BuildImageLabelZPL(img, s.labelWidth, s.labelHeight)
 	if err != nil {
+		tracePrint("zpl-build-error", s.devicePath, 0, err)
 		return err
 	}
 
-	if err := sendRawWithRetry(ctx, s.devicePath, zpl, 12, 120*time.Millisecond); err != nil {
-		return fmt.Errorf("printerga yuborilmadi: %w", err)
+	_ = os.MkdirAll(printerTraceDir, 0o755)
+	if werr := os.WriteFile(printerTraceZPLPath, zpl, 0o644); werr != nil {
+		tracePrint("zpl-dump-error", s.devicePath, len(zpl), werr)
 	}
+	tracePrint("send-start", s.devicePath, len(zpl), nil)
+
+	if err := sendRawWithRetry(ctx, s.devicePath, zpl, 12, 120*time.Millisecond); err != nil {
+		err = fmt.Errorf("printerga yuborilmadi: %w", err)
+		tracePrint("send-error", s.devicePath, len(zpl), err)
+		return err
+	}
+
+	tracePrint("send-ok", s.devicePath, len(zpl), nil)
 	return nil
 }
 
@@ -165,6 +183,26 @@ func withPrinterGlobalLock(timeout time.Duration, fn func() error) error {
 	}()
 
 	return fn()
+}
+
+func tracePrint(phase, device string, payloadBytes int, err error) {
+	_ = os.MkdirAll(printerTraceDir, 0o755)
+	f, ferr := os.OpenFile(printerTraceLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if ferr != nil {
+		return
+	}
+	defer f.Close()
+
+	stamp := time.Now().Format(time.RFC3339Nano)
+	errText := "-"
+	if err != nil {
+		errText = strings.TrimSpace(err.Error())
+		if errText == "" {
+			errText = "error"
+		}
+	}
+	line := fmt.Sprintf("%s phase=%s device=%s bytes=%d err=%s\n", stamp, strings.TrimSpace(phase), strings.TrimSpace(device), payloadBytes, errText)
+	_, _ = f.WriteString(line)
 }
 
 func isRetryablePrinterErr(err error) bool {
