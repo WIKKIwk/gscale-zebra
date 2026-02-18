@@ -15,8 +15,8 @@ func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
 	if !strings.Contains(stream, "^RFW,H,,,A^FD3034ABCDEF1234567890AA^FS") {
 		t.Fatalf("rfid write command not found in stream: %s", stream)
 	}
-	if !strings.Contains(stream, "^FDITEM: GREEN TEA^FS") {
-		t.Fatalf("human ITEM line missing: %s", stream)
+	if !strings.Contains(stream, "^FDMAHSULOT: GREEN TEA^FS") {
+		t.Fatalf("human MAHSULOT line missing: %s", stream)
 	}
 	if !strings.Contains(stream, "^FDEPC: 3034ABCDEF1234567890AA^FS") {
 		t.Fatalf("human EPC line missing: %s", stream)
@@ -41,7 +41,7 @@ func TestBuildRFIDEncodeCommand_DefaultQtyWhenEmpty(t *testing.T) {
 	if !strings.Contains(stream, "^FDQTY: - kg^FS") {
 		t.Fatalf("default qty missing: %s", stream)
 	}
-	if !strings.Contains(stream, "^FDITEM: -^FS") {
+	if !strings.Contains(stream, "^FDMAHSULOT: -^FS") {
 		t.Fatalf("default item missing: %s", stream)
 	}
 }
