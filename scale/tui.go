@@ -95,7 +95,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.info = "encode+print yuborildi"
-			return m, runEncodeEPCCmd(m.zebraPreferred)
+			return m, runEncodeEPCCmd(m.zebraPreferred, m.last.Weight, m.last.Unit)
 		case "r":
 			if m.zebraUpdates == nil {
 				m.info = "zebra monitor o'chirilgan (--no-zebra)"
@@ -123,7 +123,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.zebraUpdates != nil && m.autoDetector != nil {
 			if epc, ok := m.autoDetector.Observe(upd.Weight, upd.UpdatedAt); ok {
 				m.info = fmt.Sprintf("auto encode queued: epc=%s", epc)
-				cmd = tea.Batch(cmd, runEncodeEPCCmdWithEPC(m.zebraPreferred, epc))
+				cmd = tea.Batch(cmd, runEncodeEPCCmdWithEPC(m.zebraPreferred, epc, upd.Weight, upd.Unit))
 			}
 		}
 		return m, cmd
@@ -283,17 +283,29 @@ func waitForZebraCmd(ctx context.Context, updates <-chan ZebraStatus) tea.Cmd {
 	}
 }
 
-func runEncodeEPCCmd(preferredDevice string) tea.Cmd {
+func runEncodeEPCCmd(preferredDevice string, weight *float64, unit string) tea.Cmd {
 	epc := generateTestEPC(time.Now())
-	return runEncodeEPCCmdWithEPC(preferredDevice, epc)
+	return runEncodeEPCCmdWithEPC(preferredDevice, epc, weight, unit)
 }
 
-func runEncodeEPCCmdWithEPC(preferredDevice, epc string) tea.Cmd {
+func runEncodeEPCCmdWithEPC(preferredDevice, epc string, weight *float64, unit string) tea.Cmd {
+	qtyText := formatLabelQty(weight, unit)
 	return func() tea.Msg {
-		st := runZebraEncodeAndRead(preferredDevice, epc, 1400*time.Millisecond)
+		st := runZebraEncodeAndRead(preferredDevice, epc, qtyText, 1400*time.Millisecond)
 		st.UpdatedAt = time.Now()
 		return zebraMsg{status: st}
 	}
+}
+
+func formatLabelQty(weight *float64, unit string) string {
+	u := strings.TrimSpace(unit)
+	if u == "" {
+		u = "kg"
+	}
+	if weight == nil {
+		return "- " + u
+	}
+	return fmt.Sprintf("%.3f %s", *weight, u)
 }
 
 func runRFIDReadCmd(preferredDevice string) tea.Cmd {

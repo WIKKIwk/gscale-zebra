@@ -103,7 +103,7 @@ func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
 	return st
 }
 
-func runZebraEncodeAndRead(preferredDevice, epc string, timeout time.Duration) ZebraStatus {
+func runZebraEncodeAndRead(preferredDevice, epc, qtyText string, timeout time.Duration) ZebraStatus {
 	st := ZebraStatus{
 		Action:    "encode",
 		Verify:    "-",
@@ -127,7 +127,7 @@ func runZebraEncodeAndRead(preferredDevice, epc string, timeout time.Duration) Z
 	st.DevicePath = p.DevicePath
 	st.Name = p.DisplayName()
 
-	line1, line2, verify, err := encodeAndVerify(p.DevicePath, norm, timeout)
+	line1, line2, verify, err := encodeAndVerify(p.DevicePath, norm, qtyText, timeout)
 	if err != nil {
 		st.Error = err.Error()
 		applyZebraSnapshot(&st, p, timeout)
@@ -145,8 +145,8 @@ func runZebraEncodeAndRead(preferredDevice, epc string, timeout time.Duration) Z
 	return st
 }
 
-func encodeAndVerify(device, epc string, timeout time.Duration) (string, string, string, error) {
-	stream, err := buildRFIDEncodeCommand(epc)
+func encodeAndVerify(device, epc, qtyText string, timeout time.Duration) (string, string, string, error) {
+	stream, err := buildRFIDEncodeCommand(epc, qtyText)
 	if err != nil {
 		return "", "", "UNKNOWN", err
 	}
@@ -335,16 +335,32 @@ func safeText(fallback, v string) string {
 	return v
 }
 
-func buildRFIDEncodeCommand(epc string) (string, error) {
+func sanitizeZPLText(v string) string {
+	v = strings.ReplaceAll(v, "\n", " ")
+	v = strings.ReplaceAll(v, "\r", " ")
+	v = strings.ReplaceAll(v, "^", " ")
+	v = strings.ReplaceAll(v, "~", " ")
+	return strings.TrimSpace(v)
+}
+
+func buildRFIDEncodeCommand(epc, qtyText string) (string, error) {
 	norm, err := normalizeEPC(epc)
 	if err != nil {
 		return "", err
 	}
+
+	qty := sanitizeZPLText(strings.TrimSpace(qtyText))
+	if qty == "" {
+		qty = "- kg"
+	}
+
 	return "^XA\n" +
 		"^RS8,,,1,N\n" +
 		fmt.Sprintf("^RFW,H,,,A^FD%s^FS\n", norm) +
 		"^FO28,24^A0N,30,30\n" +
-		fmt.Sprintf("^FD%s^FS\n", norm) +
+		fmt.Sprintf("^FDEPC: %s^FS\n", sanitizeZPLText(norm)) +
+		"^FO28,68^A0N,30,30\n" +
+		fmt.Sprintf("^FDQTY: %s^FS\n", qty) +
 		"^PQ1\n" +
 		"^XZ\n", nil
 }
