@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -82,8 +81,6 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 }
 
 func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duration) (string, string, string, error) {
-	beforeValid, beforeVoid, beforeOK := readRFIDCounters(device, timeout)
-
 	stream, err := buildRFIDEncodeCommand(epc, qtyText, itemName)
 	if err != nil {
 		return "", "", "UNKNOWN", err
@@ -97,41 +94,7 @@ func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duratio
 	time.Sleep(820 * time.Millisecond)
 
 	line1, line2, verify := readbackRFIDResult(device, epc, timeout, 1)
-	afterValid, afterVoid, afterOK := readRFIDCounters(device, timeout)
-	if beforeOK && afterOK {
-		switch {
-		case afterVoid > beforeVoid:
-			verify = "VOID"
-		case afterValid > beforeValid && strings.TrimSpace(verify) != "MATCH":
-			// Real printer counters prove RFID write succeeded, even when readback sees another tag/TID.
-			verify = "WRITTEN"
-		}
-	}
 	return line1, line2, verify, nil
-}
-
-func readRFIDCounters(device string, timeout time.Duration) (int64, int64, bool) {
-	valid := queryVarRetry(device, "odometer.rfid.valid_resettable", timeout, 3, 90*time.Millisecond)
-	voidCount := queryVarRetry(device, "odometer.rfid.void_resettable", timeout, 3, 90*time.Millisecond)
-
-	v, okV := parseRFIDCounter(valid)
-	w, okW := parseRFIDCounter(voidCount)
-	if !okV || !okW {
-		return 0, 0, false
-	}
-	return v, w, true
-}
-
-func parseRFIDCounter(v string) (int64, bool) {
-	v = strings.TrimSpace(strings.Trim(v, "\""))
-	if v == "" || v == "?" {
-		return 0, false
-	}
-	n, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
-		return 0, false
-	}
-	return n, true
 }
 
 func readbackRFIDResult(device, expected string, timeout time.Duration, retries int) (string, string, string) {

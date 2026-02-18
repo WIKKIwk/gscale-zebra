@@ -166,6 +166,24 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 				epcVerify = "UNKNOWN"
 			}
 		}
+		if strings.TrimSpace(epc) == "" || epcVerify != "MATCH" {
+			note := "RFID yozuvi tasdiqlanmadi"
+			if strings.TrimSpace(epc) == "" {
+				note = note + " (EPC olinmadi)"
+			} else {
+				note = note + " (VERIFY=" + epcVerify + ")"
+			}
+			if strings.TrimSpace(epcNote) != "" {
+				note = note + " | " + strings.TrimSpace(epcNote)
+			}
+			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", epc, epcVerify, note))
+			if err := a.qtyReader.WaitForNextCycle(ctx, 10*time.Minute, 220*time.Millisecond, reading.Qty); err != nil {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return
+				}
+			}
+			continue
+		}
 
 		draft, err := a.erp.CreateMaterialIssueDraft(ctx, erp.MaterialIssueDraftInput{
 			ItemCode:  sel.ItemCode,
@@ -256,7 +274,7 @@ func formatRFIDConfirmLine(epc, verify string) string {
 		verify = "UNKNOWN"
 	}
 	confirmed := "YO'Q"
-	if strings.TrimSpace(epc) != "" && (verify == "MATCH" || verify == "WRITTEN") {
+	if strings.TrimSpace(epc) != "" && verify == "MATCH" {
 		confirmed = "HA"
 	}
 	return fmt.Sprintf("RFID temirga yozildi: %s (VERIFY=%s)", confirmed, verify)
