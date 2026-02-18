@@ -29,7 +29,11 @@ build:
 	$(DC_ENV) $(COMPOSE) build
 
 run: check-env
-	$(DC_ENV) $(COMPOSE) up --build --attach scale
+	@set -e; \
+	cleanup() { $(COMPOSE) stop bot >/dev/null 2>&1 || true; }; \
+	trap cleanup EXIT INT TERM; \
+	$(DC_ENV) $(COMPOSE) up -d --build --no-deps bot; \
+	$(DC_ENV) $(COMPOSE) run --rm --no-deps --service-ports scale
 
 run-bg: check-env
 	$(DC_ENV) $(COMPOSE) up -d --build

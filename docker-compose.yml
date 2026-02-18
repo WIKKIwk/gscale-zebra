@@ -9,8 +9,8 @@ services:
     build: *app_build
     image: gscale-zebra:local
     container_name: gscale-scale
+    entrypoint: ["/app/bin/scale"]
     command:
-      - /app/bin/scale
       - --no-bot
       - --no-bridge
       - --device
@@ -22,6 +22,9 @@ services:
     devices:
       - ${SCALE_DEVICE:-/dev/ttyUSB0}:${SCALE_DEVICE:-/dev/ttyUSB0}
       - ${ZEBRA_DEVICE:-/dev/usb/lp0}:${ZEBRA_DEVICE:-/dev/usb/lp0}
+    environment:
+      TERM: xterm-256color
+      COLORTERM: truecolor
     volumes:
       - gscale_tmp:/tmp/gscale-zebra
     tty: true
@@ -33,7 +36,7 @@ services:
     container_name: gscale-bot
     depends_on:
       - scale
-    command: ["/app/bin/bot"]
+    entrypoint: ["/app/bin/bot"]
     working_dir: /app/bot
     env_file:
       - ./bot/.env
