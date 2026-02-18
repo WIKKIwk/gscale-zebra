@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,24 +10,7 @@ import (
 )
 
 func startSerialReader(ctx context.Context, device string, baud int, unit string, out chan<- Reading) error {
-	port, err := serial.OpenPort(&serial.Config{Name: device, Baud: baud, ReadTimeout: 250 * time.Millisecond})
-	if err != nil {
-		return err
-	}
-
 	go func() {
-		defer port.Close()
-		buf := make([]byte, 256)
-		raw := ""
-
-		push(out, Reading{
-			Source:    "serial",
-			Port:      device,
-			Baud:      baud,
-			Unit:      unit,
-			UpdatedAt: time.Now(),
-		})
-
 		for {
 			select {
 			case <-ctx.Done():
@@ -34,45 +18,171 @@ func startSerialReader(ctx context.Context, device string, baud int, unit string
 			default:
 			}
 
-			n, err := port.Read(buf)
+			port, err := serial.OpenPort(&serial.Config{Name: device, Baud: baud, ReadTimeout: 250 * time.Millisecond})
 			if err != nil {
 				push(out, Reading{
 					Source:    "serial",
 					Port:      device,
 					Baud:      baud,
 					Unit:      unit,
-					Error:     err.Error(),
+					Error:     fmt.Sprintf("open error: %v", err),
 					UpdatedAt: time.Now(),
 				})
+				if !sleepWithContext(ctx, 900*time.Millisecond) {
+					return
+				}
+				continue
+			}
+
+			push(out, Reading{
+				Source:    "serial",
+				Port:      device,
+				Baud:      baud,
+				Unit:      unit,
+				UpdatedAt: time.Now(),
+			})
+
+			err = streamSerial(ctx, port, device, baud, unit, out)
+			_ = port.Close()
+
+			if ctx.Err() != nil {
 				return
 			}
-			if n == 0 {
-				continue
+
+			if err != nil {
+				push(out, Reading{
+					Source:    "serial",
+					Port:      device,
+					Baud:      baud,
+					Unit:      unit,
+					Error:     fmt.Sprintf("read error: %v", err),
+					UpdatedAt: time.Now(),
+				})
 			}
 
-			chunk := string(buf[:n])
-			if strings.TrimSpace(chunk) == "" {
-				continue
+			if !sleepWithContext(ctx, 400*time.Millisecond) {
+				return
 			}
+		}
+	}()
 
-			raw = appendRaw(raw, chunk, 240)
-			weight, parsedUnit, stable, ok := parseWeight(raw, unit)
+	return nil
+}
+
+func streamSerial(ctx context.Context, port *serial.Port, device string, baud int, unit string, out chan<- Reading) error {
+	buf := make([]byte, 256)
+	pending := ""
+	lastUnit := strings.ToLower(strings.TrimSpace(unit))
+	if lastUnit == "" {
+		lastUnit = "kg"
+	}
+	seenParsedValue := false
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		n, err := port.Read(buf)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			continue
+		}
+
+		chunk := string(buf[:n])
+		pending = appendRaw(pending, chunk, 1024)
+
+		for {
+			frame, rest, ok := popSerialFrame(pending)
 			if !ok {
+				break
+			}
+			pending = rest
+
+			trimmed := strings.TrimSpace(frame)
+			if trimmed == "" {
+				if !seenParsedValue {
+					continue
+				}
+				zero := 0.0
+				push(out, Reading{
+					Source:    "serial",
+					Port:      device,
+					Baud:      baud,
+					Weight:    &zero,
+					Unit:      lastUnit,
+					Raw:       "<empty-frame>",
+					UpdatedAt: time.Now(),
+				})
 				continue
 			}
+
+			weight, parsedUnit, stable, ok := parseWeight(trimmed, unit)
+			if !ok {
+				// Keep stream alive even when a frame cannot be parsed.
+				push(out, Reading{
+					Source:    "serial",
+					Port:      device,
+					Baud:      baud,
+					Unit:      lastUnit,
+					Raw:       trimmed,
+					UpdatedAt: time.Now(),
+				})
+				continue
+			}
+
 			w := weight
+			if strings.TrimSpace(parsedUnit) != "" {
+				lastUnit = parsedUnit
+			}
+			seenParsedValue = true
 			push(out, Reading{
 				Source:    "serial",
 				Port:      device,
 				Baud:      baud,
 				Weight:    &w,
-				Unit:      parsedUnit,
+				Unit:      lastUnit,
 				Stable:    stable,
-				Raw:       raw,
+				Raw:       trimmed,
 				UpdatedAt: time.Now(),
 			})
 		}
-	}()
+	}
+}
 
-	return nil
+func popSerialFrame(buf string) (frame, rest string, ok bool) {
+	idx := strings.IndexAny(buf, "\r\n")
+	if idx < 0 {
+		return "", buf, false
+	}
+
+	frame = buf[:idx]
+	j := idx
+	for j < len(buf) {
+		if buf[j] != '\r' && buf[j] != '\n' {
+			break
+		}
+		j++
+	}
+	rest = buf[j:]
+	return frame, rest, true
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return true
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
 }
