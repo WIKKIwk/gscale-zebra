@@ -159,6 +159,24 @@ func (c *Client) SendMessageWithInlineKeyboardAndReturnID(ctx context.Context, c
 	return c.callSendMessage(ctx, form)
 }
 
+func (c *Client) EditMessageText(ctx context.Context, chatID, messageID int64, text string, keyboard *InlineKeyboardMarkup) error {
+	if messageID <= 0 {
+		return fmt.Errorf("message_id noto'g'ri")
+	}
+	form := url.Values{}
+	form.Set("chat_id", strconv.FormatInt(chatID, 10))
+	form.Set("message_id", strconv.FormatInt(messageID, 10))
+	form.Set("text", text)
+	if keyboard != nil {
+		b, err := json.Marshal(keyboard)
+		if err != nil {
+			return err
+		}
+		form.Set("reply_markup", string(b))
+	}
+	return c.callAPI(ctx, "editMessageText", form)
+}
+
 func (c *Client) DeleteMessage(ctx context.Context, chatID, messageID int64) error {
 	if messageID <= 0 {
 		return nil

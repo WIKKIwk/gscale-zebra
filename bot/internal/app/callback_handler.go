@@ -43,9 +43,12 @@ func (a *App) handleMaterialIssueCallback(ctx context.Context, q telegram.Callba
 		return a.tg.SendMessage(ctx, chatID, "Avval /batch orqali item va ombor tanlang.")
 	}
 
-	stockPromptMessageID := q.Message.MessageID
+	statusMessageID := q.Message.MessageID
+	initial := formatBatchStatusText(sel, 0, "", 0, "", "Scale qty kutilmoqda...")
+	statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, initial)
+
 	a.startBatchSession(ctx, chatID, func(batchCtx context.Context) {
-		a.runMaterialIssueBatchLoop(batchCtx, chatID, sel, stockPromptMessageID)
+		a.runMaterialIssueBatchLoop(batchCtx, chatID, sel, statusMessageID)
 	})
 	return nil
 }
@@ -61,15 +64,18 @@ func (a *App) handleBatchStopCallback(ctx context.Context, q telegram.CallbackQu
 		if err := a.tg.AnswerCallbackQuery(ctx, q.ID, "Batch to'xtatildi"); err != nil {
 			return err
 		}
-		a.deleteMessageBestEffort(ctx, chatID, q.Message.MessageID, "delete batch-stop message warning")
-		return a.tg.SendMessage(ctx, chatID, "Batch to'xtatildi.")
+		stoppedText := formatStoppedStatus(q.Message.Text)
+		if err := a.tg.EditMessageText(ctx, chatID, q.Message.MessageID, stoppedText, nil); err != nil && !isMessageNotModifiedError(err) {
+			a.log.Printf("edit stopped status warning: %v", err)
+		}
+		return nil
 	}
 
 	return a.tg.AnswerCallbackQuery(ctx, q.ID, "Aktiv batch yo'q")
 }
 
-func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel SelectedContext, stockPromptMessageID int64) {
-	deletedStockPrompt := false
+func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel SelectedContext, statusMessageID int64) {
+	draftCount := 0
 
 	for {
 		qty, unit, err := a.qtyReader.WaitStablePositive(ctx, 35*time.Second, 220*time.Millisecond)
@@ -80,7 +86,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			if strings.Contains(strings.ToLower(err.Error()), "timeout") {
 				continue
 			}
-			a.sendMessageNoFail(ctx, chatID, "Scale qty olinmadi (fayl): "+err.Error())
+			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", "Scale xato: "+err.Error()))
 			continue
 		}
 
@@ -90,41 +96,83 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			Qty:       qty,
 		})
 		if err != nil {
-			a.sendMessageNoFail(ctx, chatID, "ERP draft yaratilmadi: "+err.Error())
+			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", "ERP xato: "+err.Error()))
 			continue
 		}
 
-		msg := fmt.Sprintf(
-			"Material Issue draft yaratildi:\nStock Entry: %s\nItem: %s\nOmbor: %s\nQTY: %.3f %s",
-			draft.Name,
-			draft.ItemCode,
-			draft.Warehouse,
-			draft.Qty,
-			strings.ToLower(strings.TrimSpace(unit)),
-		)
-		if err := a.tg.SendMessageWithInlineKeyboard(ctx, chatID, msg, commands.BuildBatchStopKeyboard()); err != nil {
-			a.log.Printf("send draft message warning: %v", err)
-		}
+		draftCount++
+		statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, unit, "Batch davom etmoqda"))
 
-		if !deletedStockPrompt && stockPromptMessageID > 0 {
-			a.deleteMessageBestEffort(ctx, chatID, stockPromptMessageID, "delete stock-entry-prompt warning")
-			deletedStockPrompt = true
-		}
-
-		if err := a.qtyReader.WaitForReset(ctx, 10*time.Minute, 220*time.Millisecond); err != nil {
+		for {
+			err := a.qtyReader.WaitForReset(ctx, 10*time.Minute, 220*time.Millisecond)
+			if err == nil {
+				break
+			}
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
-			if strings.Contains(strings.ToLower(err.Error()), "timeout") {
-				continue
-			}
-			continue
+			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, draft.Name, draft.Qty, unit, "Mahsulotni olib tashlang (0 kg)"))
 		}
 	}
 }
 
-func (a *App) sendMessageNoFail(ctx context.Context, chatID int64, text string) {
-	if err := a.tg.SendMessage(ctx, chatID, text); err != nil {
-		a.log.Printf("send message warning: %v", err)
+func (a *App) upsertBatchStatusMessage(ctx context.Context, chatID, messageID int64, text string) int64 {
+	if messageID > 0 {
+		err := a.tg.EditMessageText(ctx, chatID, messageID, text, commands.BuildBatchStopKeyboard())
+		if err == nil || isMessageNotModifiedError(err) {
+			return messageID
+		}
+		a.log.Printf("edit batch status warning: %v", err)
 	}
+
+	newID, err := a.tg.SendMessageWithInlineKeyboardAndReturnID(ctx, chatID, text, commands.BuildBatchStopKeyboard())
+	if err != nil {
+		a.log.Printf("send batch status warning: %v", err)
+		return messageID
+	}
+	return newID
+}
+
+func formatBatchStatusText(sel SelectedContext, draftCount int, draftName string, qty float64, unit, note string) string {
+	lines := []string{
+		"Batch ishlayapti",
+		fmt.Sprintf("Item: %s", strings.TrimSpace(sel.ItemCode)),
+		fmt.Sprintf("Ombor: %s", strings.TrimSpace(sel.Warehouse)),
+		fmt.Sprintf("Draftlar: %d", draftCount),
+	}
+
+	if draftCount > 0 {
+		u := strings.ToLower(strings.TrimSpace(unit))
+		if u == "" {
+			u = "kg"
+		}
+		lines = append(lines, fmt.Sprintf("Oxirgi draft: %s", strings.TrimSpace(draftName)))
+		lines = append(lines, fmt.Sprintf("Oxirgi QTY: %.3f %s", qty, u))
+	}
+
+	note = strings.TrimSpace(note)
+	if note != "" {
+		lines = append(lines, "Holat: "+note)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func formatStoppedStatus(current string) string {
+	base := strings.TrimSpace(current)
+	if base == "" {
+		base = "Batch"
+	}
+	if strings.Contains(strings.ToUpper(base), "TO'XTATILDI") {
+		return base
+	}
+	return base + "\n\nStatus: TO'XTATILDI"
+}
+
+func isMessageNotModifiedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "message is not modified")
 }
