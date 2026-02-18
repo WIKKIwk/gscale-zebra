@@ -62,5 +62,11 @@ func (a *App) handleMaterialIssueCallback(ctx context.Context, q telegram.Callba
 		draft.Qty,
 		strings.ToLower(strings.TrimSpace(unit)),
 	)
-	return a.tg.SendMessage(ctx, chatID, msg)
+	if err := a.tg.SendMessage(ctx, chatID, msg); err != nil {
+		return err
+	}
+
+	// Keep chat clean: remove the previous stock-entry selection message after success.
+	a.deleteMessageBestEffort(ctx, chatID, q.Message.MessageID, "delete stock-entry-prompt warning")
+	return nil
 }
