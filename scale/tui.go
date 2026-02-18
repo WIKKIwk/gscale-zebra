@@ -121,9 +121,14 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		cmd := waitForReadingCmd(m.ctx, m.updates)
 		if m.zebraUpdates != nil && m.autoDetector != nil {
-			if epc, ok := m.autoDetector.Observe(upd.Weight, upd.UpdatedAt); ok {
-				m.info = fmt.Sprintf("auto encode queued: epc=%s", epc)
-				cmd = tea.Batch(cmd, runEncodeEPCCmdWithEPC(m.zebraPreferred, epc, upd.Weight, upd.Unit))
+			if upd.Weight != nil {
+				if epc, ok := m.autoDetector.Observe(upd.Weight, upd.UpdatedAt); ok {
+					m.info = fmt.Sprintf("auto encode queued: epc=%s", epc)
+					cmd = tea.Batch(cmd, runEncodeEPCCmdWithEPC(m.zebraPreferred, epc, upd.Weight, upd.Unit))
+				}
+			} else if strings.TrimSpace(upd.Error) != "" {
+				// Connection/read errors should reset stability window.
+				m.autoDetector.Observe(nil, upd.UpdatedAt)
 			}
 		}
 		return m, cmd
