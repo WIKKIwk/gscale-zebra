@@ -24,6 +24,12 @@ func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
 	if !strings.Contains(stream, "^FDQTY: 1.250 kg^FS") {
 		t.Fatalf("human QTY line missing: %s", stream)
 	}
+	if !strings.Contains(stream, "^BCN,44,N,N,N") {
+		t.Fatalf("barcode command missing: %s", stream)
+	}
+	if strings.Count(stream, "3034ABCDEF1234567890AA") < 3 {
+		t.Fatalf("epc should be present for rfid write, text and barcode: %s", stream)
+	}
 }
 
 func TestBuildRFIDEncodeCommand_DefaultQtyWhenEmpty(t *testing.T) {
