@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+const (
+	maxEncodeAttempts = 3
+	readVerifyRetries = 3
+)
+
 func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
 	zebraIOMutex.Lock()
 	defer zebraIOMutex.Unlock()
@@ -62,7 +67,7 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	st.DevicePath = p.DevicePath
 	st.Name = p.DisplayName()
 
-	line1, line2, verify, err := encodeAndVerify(p.DevicePath, norm, qtyText, itemName, timeout)
+	line1, line2, verify, attempts, autoTuned, err := encodeAndVerify(p.DevicePath, norm, qtyText, itemName, timeout)
 	if err != nil {
 		st.Error = err.Error()
 		applyZebraSnapshot(&st, p, timeout)
@@ -71,6 +76,8 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	st.ReadLine1 = safeText("-", line1)
 	st.ReadLine2 = safeText("-", line2)
 	st.Verify = verify
+	st.Attempts = attempts
+	st.AutoTuned = autoTuned
 
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
@@ -80,21 +87,45 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	return st
 }
 
-func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duration) (string, string, string, error) {
-	stream, err := buildRFIDEncodeCommand(epc, qtyText, itemName)
-	if err != nil {
-		return "", "", "UNKNOWN", err
-	}
-	if err := sendRawRetry(device, []byte(stream), 18, 140*time.Millisecond); err != nil {
-		if isBusyLikeError(err) {
-			return "", "", "UNKNOWN", fmt.Errorf("%w (printer busy: boshqa process /dev/usb/lp0 ni band qilgan)", err)
-		}
-		return "", "", "UNKNOWN", err
-	}
-	time.Sleep(820 * time.Millisecond)
+func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duration) (string, string, string, int, bool, error) {
+	attempts := 0
+	autoTuned := false
+	lastLine1, lastLine2, lastVerify := "", "", "UNKNOWN"
 
-	line1, line2, verify := readbackRFIDResult(device, epc, timeout, 1)
-	return line1, line2, verify, nil
+	for i := 0; i < maxEncodeAttempts; i++ {
+		attempts++
+		stream, err := buildRFIDEncodeCommand(epc, qtyText, itemName)
+		if err != nil {
+			return "", "", "UNKNOWN", attempts, autoTuned, err
+		}
+		if err := sendRawRetry(device, []byte(stream), 18, 140*time.Millisecond); err != nil {
+			if isBusyLikeError(err) {
+				return "", "", "UNKNOWN", attempts, autoTuned, fmt.Errorf("%w (printer busy: boshqa process /dev/usb/lp0 ni band qilgan)", err)
+			}
+			return "", "", "UNKNOWN", attempts, autoTuned, err
+		}
+		time.Sleep(820 * time.Millisecond)
+
+		line1, line2, verify := readbackRFIDResult(device, epc, timeout, readVerifyRetries)
+		lastLine1, lastLine2, lastVerify = line1, line2, verify
+		if verify == "MATCH" {
+			return line1, line2, verify, attempts, autoTuned, nil
+		}
+
+		if i == maxEncodeAttempts-1 {
+			break
+		}
+
+		if shouldAutoTune(verify) || verify == "MISMATCH" {
+			note := runAutoTuneSequence(device)
+			if strings.TrimSpace(note) != "" {
+				autoTuned = true
+			}
+		}
+		waitReady(device, 1800*time.Millisecond)
+	}
+
+	return lastLine1, lastLine2, lastVerify, attempts, autoTuned, nil
 }
 
 func readbackRFIDResult(device, expected string, timeout time.Duration, retries int) (string, string, string) {
