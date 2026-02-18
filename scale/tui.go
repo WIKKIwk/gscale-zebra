@@ -109,7 +109,11 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.info = "encode+print yuborildi"
-			return m, runEncodeEPCCmd(m.zebraPreferred, m.last.Weight, m.last.Unit)
+			itemName := ""
+			if m.batchState != nil {
+				itemName = m.batchState.ItemLabel(time.Now())
+			}
+			return m, runEncodeEPCCmd(m.zebraPreferred, m.last.Weight, m.last.Unit, itemName)
 		case "r":
 			if !m.batchActive {
 				m.info = "batch inactive: botda Material Issue ni bosing"
@@ -164,7 +168,11 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if upd.Weight != nil {
 				if epc, ok := m.autoDetector.Observe(upd.Weight, upd.UpdatedAt); ok {
 					m.info = fmt.Sprintf("auto encode queued: epc=%s", epc)
-					cmd = tea.Batch(cmd, runEncodeEPCCmdWithEPC(m.zebraPreferred, epc, upd.Weight, upd.Unit))
+					itemName := ""
+					if m.batchState != nil {
+						itemName = m.batchState.ItemLabel(upd.UpdatedAt)
+					}
+					cmd = tea.Batch(cmd, runEncodeEPCCmdWithEPC(m.zebraPreferred, epc, upd.Weight, upd.Unit, itemName))
 				}
 			} else if strings.TrimSpace(upd.Error) != "" {
 				// Connection/read errors should reset stability window.
@@ -337,15 +345,16 @@ func waitForZebraCmd(ctx context.Context, updates <-chan ZebraStatus) tea.Cmd {
 	}
 }
 
-func runEncodeEPCCmd(preferredDevice string, weight *float64, unit string) tea.Cmd {
+func runEncodeEPCCmd(preferredDevice string, weight *float64, unit, itemName string) tea.Cmd {
 	epc := generateTestEPC(time.Now())
-	return runEncodeEPCCmdWithEPC(preferredDevice, epc, weight, unit)
+	return runEncodeEPCCmdWithEPC(preferredDevice, epc, weight, unit, itemName)
 }
 
-func runEncodeEPCCmdWithEPC(preferredDevice, epc string, weight *float64, unit string) tea.Cmd {
+func runEncodeEPCCmdWithEPC(preferredDevice, epc string, weight *float64, unit, itemName string) tea.Cmd {
 	qtyText := formatLabelQty(weight, unit)
+	itemName = strings.TrimSpace(itemName)
 	return func() tea.Msg {
-		st := runZebraEncodeAndRead(preferredDevice, epc, qtyText, 1400*time.Millisecond)
+		st := runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName, 1400*time.Millisecond)
 		st.UpdatedAt = time.Now()
 		return zebraMsg{status: st}
 	}

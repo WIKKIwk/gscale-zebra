@@ -20,31 +20,48 @@ type warehouseQueryRequest struct {
 	Query    string
 }
 
-func ExtractSelectedItemCode(text string) (string, bool) {
+func ExtractSelectedItem(text string) (string, string, bool) {
 	lines := strings.Split(strings.TrimSpace(text), "\n")
 	if len(lines) == 0 {
-		return "", false
+		return "", "", false
 	}
 
-	first := strings.TrimSpace(lines[0])
-	if len(first) < len("item:") {
-		return "", false
-	}
-	if !strings.HasPrefix(strings.ToLower(first), "item:") {
-		return "", false
+	var code string
+	var name string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(lower, "item:") {
+			code = strings.TrimSpace(line[len("item:"):])
+			continue
+		}
+		if strings.HasPrefix(lower, "nomi:") {
+			name = strings.TrimSpace(line[len("nomi:"):])
+		}
 	}
 
-	code := strings.TrimSpace(first[len("item:"):])
 	if code == "" {
-		return "", false
+		return "", "", false
 	}
-	return code, true
+	if name == "" {
+		name = code
+	}
+	return code, name, true
 }
 
-func HandleItemSelected(ctx context.Context, deps Deps, chatID int64, itemCode string) (int64, error) {
+func ExtractSelectedItemCode(text string) (string, bool) {
+	code, _, ok := ExtractSelectedItem(text)
+	return code, ok
+}
+
+func HandleItemSelected(ctx context.Context, deps Deps, chatID int64, itemCode, itemName string) (int64, error) {
 	itemCode = strings.TrimSpace(itemCode)
+	itemName = strings.TrimSpace(itemName)
 	if itemCode == "" {
 		return 0, nil
+	}
+	if itemName == "" {
+		itemName = itemCode
 	}
 
 	keyboard := &telegram.InlineKeyboardMarkup{
@@ -55,7 +72,7 @@ func HandleItemSelected(ctx context.Context, deps Deps, chatID int64, itemCode s
 		},
 	}
 
-	text := fmt.Sprintf("Item tanlandi: %s\nEndi pastdagi tugmani bosib omborni tanlang.", itemCode)
+	text := fmt.Sprintf("Item tanlandi: %s\nKod: %s\nEndi pastdagi tugmani bosib omborni tanlang.", itemName, itemCode)
 	messageID, err := deps.TG.SendMessageWithInlineKeyboardAndReturnID(ctx, chatID, text, keyboard)
 	if err == nil {
 		return messageID, nil

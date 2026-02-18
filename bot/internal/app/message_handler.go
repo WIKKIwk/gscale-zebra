@@ -23,17 +23,18 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 	}
 
 	if itemCode, warehouse, ok := commands.ExtractSelectedWarehouse(text); ok {
-		a.rememberSelection(msg.Chat.ID, itemCode, warehouse)
+		itemName := a.itemNameFor(msg.Chat.ID, itemCode)
+		a.rememberSelection(msg.Chat.ID, itemCode, itemName, warehouse)
 
 		if statusMessageID, pending := a.consumeBatchChangePending(msg.Chat.ID); pending {
-			a.startMaterialIssueBatch(ctx, msg.Chat.ID, SelectedContext{ItemCode: itemCode, Warehouse: warehouse}, statusMessageID, "Item almashtirildi, oqim davom etmoqda")
+			a.startMaterialIssueBatch(ctx, msg.Chat.ID, SelectedContext{ItemCode: itemCode, ItemName: itemName, Warehouse: warehouse}, statusMessageID, "Item almashtirildi, oqim davom etmoqda")
 			a.deleteTrackedBatchPromptMessage(ctx, msg.Chat.ID)
 			a.deleteTrackedWarehousePromptMessage(ctx, msg.Chat.ID)
 			a.deleteMessageBestEffort(ctx, msg.Chat.ID, msg.MessageID, "delete selected-warehouse warning")
 			return nil
 		}
 
-		if err := commands.HandleWarehouseSelected(ctx, a.deps(), msg.Chat.ID, itemCode, warehouse); err != nil {
+		if err := commands.HandleWarehouseSelected(ctx, a.deps(), msg.Chat.ID, itemCode, itemName, warehouse); err != nil {
 			return err
 		}
 		a.deleteTrackedWarehousePromptMessage(ctx, msg.Chat.ID)
@@ -41,8 +42,10 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		return nil
 	}
 
-	if itemCode, ok := commands.ExtractSelectedItemCode(text); ok {
-		messageID, err := commands.HandleItemSelected(ctx, a.deps(), msg.Chat.ID, itemCode)
+	if itemCode, itemName, ok := commands.ExtractSelectedItem(text); ok {
+		a.rememberItemChoice(msg.Chat.ID, itemCode, itemName)
+
+		messageID, err := commands.HandleItemSelected(ctx, a.deps(), msg.Chat.ID, itemCode, itemName)
 		if err != nil {
 			return err
 		}

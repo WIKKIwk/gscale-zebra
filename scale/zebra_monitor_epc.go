@@ -35,7 +35,7 @@ func sanitizeZPLText(v string) string {
 	return strings.TrimSpace(v)
 }
 
-func buildRFIDEncodeCommand(epc, qtyText string) (string, error) {
+func buildRFIDEncodeCommand(epc, qtyText, itemName string) (string, error) {
 	norm, err := normalizeEPC(epc)
 	if err != nil {
 		return "", err
@@ -45,16 +45,22 @@ func buildRFIDEncodeCommand(epc, qtyText string) (string, error) {
 	if qty == "" {
 		qty = "- kg"
 	}
+	item := sanitizeZPLText(strings.TrimSpace(itemName))
+	if item == "" {
+		item = "-"
+	}
 
 	return "^XA\n" +
 		"^LH0,0\n" +
 		"^MMT\n" +
 		"^RS8,,,1,N\n" +
 		fmt.Sprintf("^RFW,H,,,A^FD%s^FS\n", norm) +
-		"^FO20,24^A0N,22,22^FB520,3,0,L,0\n" +
-		fmt.Sprintf("^FDEPC: %s^FS\n", sanitizeZPLText(norm)) +
-		"^FO20,94^A0N,28,28\n" +
+		"^FO8,12^A0N,24,20^FB760,1,0,L,0\n" +
+		fmt.Sprintf("^FDITEM: %s^FS\n", item) +
+		"^FO8,52^A0N,32,28\n" +
 		fmt.Sprintf("^FDQTY: %s^FS\n", qty) +
+		"^FO8,100^A0N,24,20^FB760,1,0,L,0\n" +
+		fmt.Sprintf("^FDEPC: %s^FS\n", sanitizeZPLText(norm)) +
 		"^PQ1\n" +
 		"^XZ\n", nil
 }

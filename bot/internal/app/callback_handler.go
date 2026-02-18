@@ -191,7 +191,7 @@ func (a *App) upsertBatchStatusMessage(ctx context.Context, chatID, messageID in
 func formatBatchStatusText(sel SelectedContext, draftCount int, draftName string, qty float64, unit, epc, note string) string {
 	lines := []string{
 		"Batch ishlayapti",
-		fmt.Sprintf("Item: %s", strings.TrimSpace(sel.ItemCode)),
+		fmt.Sprintf("Item: %s", formatSelectedItem(sel)),
 		fmt.Sprintf("Ombor: %s", strings.TrimSpace(sel.Warehouse)),
 		fmt.Sprintf("Draftlar: %d", draftCount),
 	}
@@ -216,6 +216,21 @@ func formatBatchStatusText(sel SelectedContext, draftCount int, draftName string
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func formatSelectedItem(sel SelectedContext) string {
+	code := strings.TrimSpace(sel.ItemCode)
+	name := strings.TrimSpace(sel.ItemName)
+	if name == "" {
+		name = code
+	}
+	if code == "" {
+		return "-"
+	}
+	if strings.EqualFold(name, code) {
+		return code
+	}
+	return name + " (" + code + ")"
 }
 
 func formatPausedStatus(current string) string {

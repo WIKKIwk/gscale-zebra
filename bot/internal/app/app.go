@@ -26,6 +26,7 @@ type App struct {
 	batchPromptMsgByChat     map[int64]int64
 	warehousePromptMsgByChat map[int64]int64
 	selectionByChat          map[int64]SelectedContext
+	itemChoiceByChat         map[int64]itemChoice
 	batchChangeMsgByChat     map[int64]int64
 	imageAwaitByChat         map[int64]bool
 
@@ -41,7 +42,13 @@ type batchSession struct {
 
 type SelectedContext struct {
 	ItemCode  string
+	ItemName  string
 	Warehouse string
+}
+
+type itemChoice struct {
+	ItemCode string
+	ItemName string
 }
 
 func New(cfg config.Config, logger *log.Logger) *App {
@@ -60,6 +67,7 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		batchPromptMsgByChat:     make(map[int64]int64),
 		warehousePromptMsgByChat: make(map[int64]int64),
 		selectionByChat:          make(map[int64]SelectedContext),
+		itemChoiceByChat:         make(map[int64]itemChoice),
 		batchChangeMsgByChat:     make(map[int64]int64),
 		imageAwaitByChat:         make(map[int64]bool),
 		batchByChat:              make(map[int64]batchSession),

@@ -63,7 +63,7 @@ func (a *App) stopAllBatchSessions() {
 	}
 	a.batchByChat = make(map[int64]batchSession)
 	a.batchMu.Unlock()
-	a.setBatchState(false, 0)
+	a.setBatchState(false, 0, SelectedContext{})
 
 	for _, c := range cancels {
 		c()

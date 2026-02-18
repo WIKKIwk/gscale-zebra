@@ -7,13 +7,16 @@ import (
 )
 
 func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
-	stream, err := buildRFIDEncodeCommand("3034ABCDEF1234567890AA", "1.250 kg")
+	stream, err := buildRFIDEncodeCommand("3034ABCDEF1234567890AA", "1.250 kg", "GREEN TEA")
 	if err != nil {
 		t.Fatalf("buildRFIDEncodeCommand error: %v", err)
 	}
 
 	if !strings.Contains(stream, "^RFW,H,,,A^FD3034ABCDEF1234567890AA^FS") {
 		t.Fatalf("rfid write command not found in stream: %s", stream)
+	}
+	if !strings.Contains(stream, "^FDITEM: GREEN TEA^FS") {
+		t.Fatalf("human ITEM line missing: %s", stream)
 	}
 	if !strings.Contains(stream, "^FDEPC: 3034ABCDEF1234567890AA^FS") {
 		t.Fatalf("human EPC line missing: %s", stream)
@@ -24,13 +27,16 @@ func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
 }
 
 func TestBuildRFIDEncodeCommand_DefaultQtyWhenEmpty(t *testing.T) {
-	stream, err := buildRFIDEncodeCommand("3034ABCDEF1234567890AA", "")
+	stream, err := buildRFIDEncodeCommand("3034ABCDEF1234567890AA", "", "")
 	if err != nil {
 		t.Fatalf("buildRFIDEncodeCommand error: %v", err)
 	}
 
 	if !strings.Contains(stream, "^FDQTY: - kg^FS") {
 		t.Fatalf("default qty missing: %s", stream)
+	}
+	if !strings.Contains(stream, "^FDITEM: -^FS") {
+		t.Fatalf("default item missing: %s", stream)
 	}
 }
 

@@ -12,6 +12,9 @@ type batchStateReader struct {
 	cached        bool
 	value         bool
 	nextReadAt    time.Time
+	itemCode      string
+	itemName      string
+	warehouse     string
 }
 
 func newBatchStateReader(path string, defaultActive bool) *batchStateReader {
@@ -26,14 +29,30 @@ func newBatchStateReader(path string, defaultActive bool) *batchStateReader {
 }
 
 func (r *batchStateReader) Active(now time.Time) bool {
+	r.refresh(now)
+	return r.value
+}
+
+func (r *batchStateReader) ItemLabel(now time.Time) string {
+	r.refresh(now)
+	if !r.value {
+		return ""
+	}
+	if strings.TrimSpace(r.itemName) != "" {
+		return strings.TrimSpace(r.itemName)
+	}
+	return strings.TrimSpace(r.itemCode)
+}
+
+func (r *batchStateReader) refresh(now time.Time) {
 	if r == nil {
-		return true
+		return
 	}
 	if now.IsZero() {
 		now = time.Now()
 	}
 	if r.cached && now.Before(r.nextReadAt) {
-		return r.value
+		return
 	}
 
 	snap, err := r.store.Read()
@@ -43,15 +62,29 @@ func (r *batchStateReader) Active(now time.Time) bool {
 			r.cached = true
 		}
 		r.nextReadAt = now.Add(250 * time.Millisecond)
-		return r.value
+		return
 	}
 
 	if strings.TrimSpace(snap.Batch.UpdatedAt) == "" && snap.Batch.ChatID == 0 && !snap.Batch.Active {
 		r.value = r.defaultActive
+		r.itemCode = ""
+		r.itemName = ""
+		r.warehouse = ""
 	} else {
 		r.value = snap.Batch.Active
+		r.itemCode = strings.TrimSpace(snap.Batch.ItemCode)
+		r.itemName = strings.TrimSpace(snap.Batch.ItemName)
+		if r.itemName == "" {
+			r.itemName = r.itemCode
+		}
+		r.warehouse = strings.TrimSpace(snap.Batch.Warehouse)
+		if !r.value {
+			r.itemCode = ""
+			r.itemName = ""
+			r.warehouse = ""
+		}
 	}
+
 	r.cached = true
 	r.nextReadAt = now.Add(250 * time.Millisecond)
-	return r.value
 }

@@ -40,11 +40,15 @@ func ExtractSelectedWarehouse(text string) (string, string, bool) {
 	return itemCode, warehouse, true
 }
 
-func HandleWarehouseSelected(ctx context.Context, deps Deps, chatID int64, itemCode, warehouse string) error {
+func HandleWarehouseSelected(ctx context.Context, deps Deps, chatID int64, itemCode, itemName, warehouse string) error {
 	itemCode = strings.TrimSpace(itemCode)
+	itemName = strings.TrimSpace(itemName)
 	warehouse = strings.TrimSpace(warehouse)
 	if itemCode == "" || warehouse == "" {
 		return nil
+	}
+	if itemName == "" {
+		itemName = itemCode
 	}
 
 	keyboard := &telegram.InlineKeyboardMarkup{
@@ -56,7 +60,7 @@ func HandleWarehouseSelected(ctx context.Context, deps Deps, chatID int64, itemC
 		},
 	}
 
-	text := fmt.Sprintf("Item tanlandi: %s\nOmbor tanlandi: %s\nStock entry tanlang:", itemCode, warehouse)
+	text := fmt.Sprintf("Item tanlandi: %s\nKod: %s\nOmbor tanlandi: %s\nStock entry tanlang:", itemName, itemCode, warehouse)
 	return deps.TG.SendMessageWithInlineKeyboard(ctx, chatID, text, keyboard)
 }
 

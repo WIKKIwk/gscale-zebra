@@ -35,7 +35,7 @@ func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
 	return st
 }
 
-func runZebraEncodeAndRead(preferredDevice, epc, qtyText string, timeout time.Duration) ZebraStatus {
+func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeout time.Duration) ZebraStatus {
 	zebraIOMutex.Lock()
 	defer zebraIOMutex.Unlock()
 
@@ -62,7 +62,7 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText string, timeout time.Du
 	st.DevicePath = p.DevicePath
 	st.Name = p.DisplayName()
 
-	line1, line2, verify, err := encodeAndVerify(p.DevicePath, norm, qtyText, timeout)
+	line1, line2, verify, err := encodeAndVerify(p.DevicePath, norm, qtyText, itemName, timeout)
 	if err != nil {
 		st.Error = err.Error()
 		applyZebraSnapshot(&st, p, timeout)
@@ -80,8 +80,8 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText string, timeout time.Du
 	return st
 }
 
-func encodeAndVerify(device, epc, qtyText string, timeout time.Duration) (string, string, string, error) {
-	stream, err := buildRFIDEncodeCommand(epc, qtyText)
+func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duration) (string, string, string, error) {
+	stream, err := buildRFIDEncodeCommand(epc, qtyText, itemName)
 	if err != nil {
 		return "", "", "UNKNOWN", err
 	}
