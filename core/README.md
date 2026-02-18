@@ -7,4 +7,4 @@ Qoidalar:
 - Faqat musbat (`> 0`) qiymatlar uchun ishlaydi.
 - `0` yoki minus bo'lsa EPC hech qachon yuborilmaydi.
 - Har bir yangi barqaror nuqta uchun yangi (unikal) EPC yaratiladi.
-- EPC 22 xonali hex formatda vaqt (millisecond) asosida qilinadi.
+- EPC 24 xonali hex formatda vaqt (`unix nano`) + sequence asosida qilinadi.

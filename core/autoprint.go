@@ -28,7 +28,7 @@ type StableEPCDetector struct {
 	since     time.Time
 	printed   bool
 
-	lastMS int64
+	lastNS int64
 	seq    uint32
 }
 
@@ -84,7 +84,7 @@ func (d *StableEPCDetector) Observe(weight *float64, at time.Time) (string, bool
 	}
 
 	d.printed = true
-	return d.nextEPC22(at), true
+	return d.nextEPC24(at), true
 }
 
 func (d *StableEPCDetector) reset() {
@@ -94,15 +94,15 @@ func (d *StableEPCDetector) reset() {
 	d.since = time.Time{}
 }
 
-// nextEPC22 returns a 22-char uppercase hex EPC-like id:
-// 30 + 12 hex chars (unix ms) + 8 hex chars (sequence)
-func (d *StableEPCDetector) nextEPC22(t time.Time) string {
-	ms := t.UnixMilli()
-	if ms != d.lastMS {
-		d.lastMS = ms
+// nextEPC24 returns a 24-char uppercase hex EPC-like id:
+// 30 + 14 hex chars (unix ns low 56-bit) + 8 hex chars (sequence).
+func (d *StableEPCDetector) nextEPC24(t time.Time) string {
+	ns := t.UnixNano()
+	if ns != d.lastNS {
+		d.lastNS = ns
 		d.seq = 0
 	} else {
 		d.seq++
 	}
-	return fmt.Sprintf("30%012X%08X", uint64(ms)&0xFFFFFFFFFFFF, d.seq)
+	return fmt.Sprintf("30%014X%08X", uint64(ns)&0x00FFFFFFFFFFFFFF, d.seq)
 }

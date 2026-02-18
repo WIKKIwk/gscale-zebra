@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
@@ -44,4 +45,30 @@ func TestFormatLabelQty(t *testing.T) {
 	if got != "- kg" {
 		t.Fatalf("formatLabelQty nil mismatch: got=%q", got)
 	}
+}
+
+func TestGenerateTestEPC_LengthAndUniq(t *testing.T) {
+	t0 := time.Unix(1_700_000_000, 123_456_789)
+	a := generateTestEPC(t0)
+	b := generateTestEPC(t0)
+
+	if len(a) != 24 || len(b) != 24 {
+		t.Fatalf("epc len mismatch: a=%d b=%d", len(a), len(b))
+	}
+	if a == b {
+		t.Fatalf("expected unique epc for same tick: %s", a)
+	}
+	if !isUpperHexScale(a) || !isUpperHexScale(b) {
+		t.Fatalf("epc must be uppercase hex: a=%s b=%s", a, b)
+	}
+}
+
+func isUpperHexScale(v string) bool {
+	for _, ch := range v {
+		if strings.ContainsRune("0123456789ABCDEF", ch) {
+			continue
+		}
+		return false
+	}
+	return true
 }

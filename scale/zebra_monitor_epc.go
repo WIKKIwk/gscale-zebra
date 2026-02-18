@@ -4,7 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
+)
+
+var (
+	testEPCMu     sync.Mutex
+	testEPCLastNS int64
+	testEPCSeq    uint32
 )
 
 func safeText(fallback, v string) string {
@@ -67,9 +74,22 @@ func normalizeEPC(epc string) (string, error) {
 }
 
 func generateTestEPC(t time.Time) string {
-	sec := uint64(t.Unix()) & 0xFFFFFFFF
-	ns := uint64(t.Nanosecond()) & 0xFFFFFFFF
-	return fmt.Sprintf("3034%08X%08X", sec, ns)
+	if t.IsZero() {
+		t = time.Now()
+	}
+	ns := t.UnixNano()
+
+	testEPCMu.Lock()
+	defer testEPCMu.Unlock()
+
+	if ns != testEPCLastNS {
+		testEPCLastNS = ns
+		testEPCSeq = 0
+	} else {
+		testEPCSeq++
+	}
+
+	return fmt.Sprintf("30%014X%08X", uint64(ns)&0x00FFFFFFFFFFFFFF, testEPCSeq)
 }
 
 func inferVerify(line1, line2, expected string) string {
