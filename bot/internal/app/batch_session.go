@@ -15,6 +15,7 @@ func (a *App) startBatchSession(parent context.Context, chatID int64, run func(c
 	prev, hasPrev := a.batchByChat[chatID]
 	a.batchByChat[chatID] = session
 	a.batchMu.Unlock()
+	a.syncBatchStateFromSessions(chatID)
 
 	if hasPrev && prev.cancel != nil {
 		prev.cancel()
@@ -28,6 +29,7 @@ func (a *App) startBatchSession(parent context.Context, chatID int64, run func(c
 			delete(a.batchByChat, chatID)
 		}
 		a.batchMu.Unlock()
+		a.syncBatchStateFromSessions(chatID)
 	}(chatID, session.id)
 }
 
@@ -42,6 +44,7 @@ func (a *App) stopBatchSession(chatID int64) bool {
 		delete(a.batchByChat, chatID)
 	}
 	a.batchMu.Unlock()
+	a.syncBatchStateFromSessions(chatID)
 
 	if ok && s.cancel != nil {
 		s.cancel()
@@ -60,6 +63,7 @@ func (a *App) stopAllBatchSessions() {
 	}
 	a.batchByChat = make(map[int64]batchSession)
 	a.batchMu.Unlock()
+	a.setBatchState(false, 0)
 
 	for _, c := range cancels {
 		c()

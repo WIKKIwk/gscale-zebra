@@ -33,4 +33,7 @@ func TestLoadSupportsColonAndAliasKeys(t *testing.T) {
 	if cfg.ScaleQtyFile != defaultScaleQtyFile {
 		t.Fatalf("ScaleQtyFile mismatch: %q", cfg.ScaleQtyFile)
 	}
+	if cfg.BatchStateFile != defaultBatchStateFile {
+		t.Fatalf("BatchStateFile mismatch: %q", cfg.BatchStateFile)
+	}
 }

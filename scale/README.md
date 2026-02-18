@@ -52,6 +52,13 @@ Agar bot papkasi boshqa joyda bo'lsa:
 go run . --bot-dir /home/wikki/local.git/gscale-zebra/bot
 ```
 
+## Batch stop bilan auto print boshqaruvi
+
+Auto EPC/print oqimi `batch_state.json` orqali boshqariladi.
+
+- Botda `Material Issue` bosilganda `active=true` bo'ladi va scale auto print ishlaydi.
+- Botda `Batch Stop` bosilganda `active=false` bo'ladi va scale endi zebra'ga auto print yubormaydi.
+
 ## Parametrlar
 
 - `--device /dev/ttyUSB0` - tarozi qurilmasini qo'lda berish
@@ -67,6 +74,8 @@ go run . --bot-dir /home/wikki/local.git/gscale-zebra/bot
 - `--no-zebra` - Zebra monitoring va `e/r` actionlarni o'chirish
 - `--bot-dir ../bot` - bot modul joylashuvi
 - `--no-bot` - bot auto-start ni o'chirish
+- `--qty-file /tmp/gscale-zebra/qty.json` - bot o'qiydigan shared qty fayli
+- `--batch-state-file /tmp/gscale-zebra/batch_state.json` - bot boshqaradigan batch holati fayli
 
 ## EPC tasdiq haqida
 

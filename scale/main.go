@@ -72,7 +72,7 @@ func main() {
 		}
 	}
 
-	if err := runTUI(ctx, updates, zebraUpdates, sourceLine, cfg.zebraDevice, cfg.qtyFile, serialErr); err != nil {
+	if err := runTUI(ctx, updates, zebraUpdates, sourceLine, cfg.zebraDevice, cfg.qtyFile, cfg.batchStateFile, cfg.disableBot, serialErr); err != nil {
 		cancel()
 		if botProc != nil {
 			if stopErr := botProc.Stop(3 * time.Second); stopErr != nil {

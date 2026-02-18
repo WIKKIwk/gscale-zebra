@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"bot/internal/app/commands"
+	"bot/internal/batchstate"
 	"bot/internal/config"
 	"bot/internal/erp"
 	"bot/internal/qtyfile"
@@ -17,6 +18,7 @@ type App struct {
 	tg                       *telegram.Client
 	erp                      *erp.Client
 	qtyReader                *qtyfile.Client
+	batchState               *batchstate.Store
 	log                      *log.Logger
 	startInfoMsgByChat       map[int64]int64
 	batchPromptMsgByChat     map[int64]int64
@@ -47,6 +49,7 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		tg:                       telegram.New(cfg.TelegramBotToken),
 		erp:                      erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
 		qtyReader:                qtyfile.New(cfg.ScaleQtyFile),
+		batchState:               batchstate.New(cfg.BatchStateFile),
 		log:                      logger,
 		startInfoMsgByChat:       make(map[int64]int64),
 		batchPromptMsgByChat:     make(map[int64]int64),

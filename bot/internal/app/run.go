@@ -9,8 +9,10 @@ import (
 )
 
 func (a *App) Run(ctx context.Context) error {
-	a.log.Printf("bot started, ERP=%s qty_file=%s", a.cfg.ERPURL, a.cfg.ScaleQtyFile)
+	a.setBatchState(false, 0)
+	a.log.Printf("bot started, ERP=%s qty_file=%s batch_state=%s", a.cfg.ERPURL, a.cfg.ScaleQtyFile, a.cfg.BatchStateFile)
 	defer a.stopAllBatchSessions()
+	defer a.setBatchState(false, 0)
 	var offset int64
 
 	for {

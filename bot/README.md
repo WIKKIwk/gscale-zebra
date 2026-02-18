@@ -22,6 +22,16 @@ go run ./cmd/bot
   - Tugma bosilganda current chat'da Telegram inline menu ochiladi.
   - Inline query natijalarida ERPNext'dagi itemlar chiqadi.
 
+## Batch state
+
+Bot batch session holatini shared faylga yozadi:
+
+- default: `/tmp/gscale-zebra/batch_state.json`
+- `.env`: `BATCH_STATE_FILE=...`
+
+`Material Issue` bosilganda `active=true`, `Batch Stop` bosilganda `active=false` bo'ladi.
+Scale TUI shu fayl orqali auto printni boshqaradi.
+
 ## Eslatma
 
 Inline menu ishlashi uchun botda inline mode yoqilgan bo'lishi kerak (`@BotFather` -> `/setinline`).

@@ -11,6 +11,7 @@ import (
 )
 
 const defaultScaleQtyFile = "/tmp/gscale-zebra/qty.json"
+const defaultBatchStateFile = "/tmp/gscale-zebra/batch_state.json"
 
 type Config struct {
 	TelegramBotToken string
@@ -18,6 +19,7 @@ type Config struct {
 	ERPAPIKey        string
 	ERPAPISecret     string
 	ScaleQtyFile     string
+	BatchStateFile   string
 }
 
 func Load(envPath string) (Config, error) {
@@ -57,6 +59,11 @@ func Load(envPath string) (Config, error) {
 			fileVals["SCALE_QTY_FILE"],
 			defaultScaleQtyFile,
 		),
+		BatchStateFile: firstNonEmpty(
+			os.Getenv("BATCH_STATE_FILE"),
+			fileVals["BATCH_STATE_FILE"],
+			defaultBatchStateFile,
+		),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -82,6 +89,9 @@ func (c Config) Validate() error {
 	}
 	if strings.TrimSpace(c.ScaleQtyFile) == "" {
 		return errors.New("SCALE_QTY_FILE bo'sh")
+	}
+	if strings.TrimSpace(c.BatchStateFile) == "" {
+		return errors.New("BATCH_STATE_FILE bo'sh")
 	}
 
 	u, err := url.Parse(strings.TrimSpace(c.ERPURL))

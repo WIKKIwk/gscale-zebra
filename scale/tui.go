@@ -29,6 +29,8 @@ type tuiModel struct {
 	sourceLine     string
 	zebraPreferred string
 	qtyFile        string
+	batchState     *batchStateReader
+	batchActive    bool
 	message        string
 	info           string
 	last           Reading
@@ -39,7 +41,7 @@ type tuiModel struct {
 	autoDetector   *corepkg.StableEPCDetector
 }
 
-func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, qtyFile string, serialErr error) error {
+func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, qtyFile string, batchStateFile string, autoWhenNoBatch bool, serialErr error) error {
 	m := tuiModel{
 		ctx:            ctx,
 		updates:        updates,
@@ -47,6 +49,8 @@ func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan Zeb
 		sourceLine:     sourceLine,
 		zebraPreferred: zebraPreferred,
 		qtyFile:        qtyFile,
+		batchState:     newBatchStateReader(batchStateFile, autoWhenNoBatch),
+		batchActive:    true,
 		last:           Reading{Unit: "kg"},
 		message:        "scale oqimi kutilmoqda",
 		info:           "ready",
@@ -59,6 +63,9 @@ func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan Zeb
 			ReadLine2: "-",
 			UpdatedAt: time.Now(),
 		},
+	}
+	if m.batchState != nil {
+		m.batchActive = m.batchState.Active(time.Now())
 	}
 	if serialErr != nil {
 		m.message = serialErr.Error()
@@ -92,6 +99,10 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "e":
+			if !m.batchActive {
+				m.info = "batch inactive: botda Material Issue ni bosing"
+				return m, nil
+			}
 			if m.zebraUpdates == nil {
 				m.info = "zebra monitor o'chirilgan (--no-zebra)"
 				return m, nil
@@ -99,6 +110,10 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.info = "encode+print yuborildi"
 			return m, runEncodeEPCCmd(m.zebraPreferred, m.last.Weight, m.last.Unit)
 		case "r":
+			if !m.batchActive {
+				m.info = "batch inactive: botda Material Issue ni bosing"
+				return m, nil
+			}
 			if m.zebraUpdates == nil {
 				m.info = "zebra monitor o'chirilgan (--no-zebra)"
 				return m, nil
@@ -114,6 +129,18 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			upd.Unit = m.last.Unit
 		}
 
+		prevBatchActive := m.batchActive
+		if m.batchState != nil {
+			m.batchActive = m.batchState.Active(time.Now())
+		}
+		if prevBatchActive != m.batchActive {
+			if m.batchActive {
+				m.info = "batch active: auto print yoqildi"
+			} else {
+				m.info = "batch inactive: auto print to'xtadi"
+			}
+		}
+
 		m.last = upd
 		if err := writeQtySnapshot(m.qtyFile, upd, m.zebra); err != nil {
 			m.info = "qty snapshot xato: " + err.Error()
@@ -125,6 +152,13 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		cmd := waitForReadingCmd(m.ctx, m.updates)
+		if !m.batchActive {
+			if m.autoDetector != nil {
+				m.autoDetector.Observe(nil, upd.UpdatedAt)
+			}
+			return m, cmd
+		}
+
 		if m.zebraUpdates != nil && m.autoDetector != nil {
 			if upd.Weight != nil {
 				if epc, ok := m.autoDetector.Observe(upd.Weight, upd.UpdatedAt); ok {
@@ -171,7 +205,6 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 }
-
 func (m tuiModel) View() string {
 	w, _ := viewSize(m.width, m.height)
 	now := m.now
@@ -244,6 +277,7 @@ func (m tuiModel) View() string {
 
 	scaleLines := []string{
 		kv("STATUS", scaleState),
+		kv("BATCH", batchGateText(m.batchActive)),
 		kv("QTY", qty),
 		kv("STABLE", strings.ToUpper(stableText(m.last.Stable))),
 		kv("UPDATED", updated),
@@ -489,6 +523,13 @@ func stateText(connected bool) string {
 		return "UP"
 	}
 	return "DOWN"
+}
+
+func batchGateText(active bool) string {
+	if active {
+		return "ACTIVE"
+	}
+	return "STOPPED"
 }
 
 func centerTitle(title string, width int) string {

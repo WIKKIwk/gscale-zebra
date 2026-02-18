@@ -10,6 +10,7 @@ import (
 )
 
 const defaultSharedQtyFile = "/tmp/gscale-zebra/qty.json"
+const defaultSharedBatchStateFile = "/tmp/gscale-zebra/batch_state.json"
 
 type appConfig struct {
 	device         string
@@ -25,6 +26,7 @@ type appConfig struct {
 	botDir         string
 	disableBot     bool
 	qtyFile        string
+	batchStateFile string
 }
 
 func parseFlags() (appConfig, error) {
@@ -46,6 +48,7 @@ func parseFlags() (appConfig, error) {
 	flag.StringVar(&cfg.botDir, "bot-dir", "../bot", "telegram bot module directory")
 	flag.BoolVar(&cfg.disableBot, "no-bot", false, "disable auto-start telegram bot")
 	flag.StringVar(&cfg.qtyFile, "qty-file", defaultSharedQtyFile, "shared qty JSON file for bot")
+	flag.StringVar(&cfg.batchStateFile, "batch-state-file", defaultSharedBatchStateFile, "shared batch state JSON file (controls auto print)")
 	flag.Parse()
 
 	bauds, err := parseBaudList(baudListRaw, preferredBaud)
