@@ -1,0 +1,50 @@
+name: gscale-zebra
+
+x-app-build: &app_build
+  context: .
+  dockerfile: Dockerfile
+
+services:
+  scale:
+    build: *app_build
+    image: gscale-zebra:local
+    container_name: gscale-scale
+    command:
+      - /app/bin/scale
+      - --no-bot
+      - --no-bridge
+      - --device
+      - ${SCALE_DEVICE:-/dev/ttyUSB0}
+      - --zebra-device
+      - ${ZEBRA_DEVICE:-/dev/usb/lp0}
+      - --bridge-state-file
+      - /tmp/gscale-zebra/bridge_state.json
+    devices:
+      - ${SCALE_DEVICE:-/dev/ttyUSB0}:${SCALE_DEVICE:-/dev/ttyUSB0}
+      - ${ZEBRA_DEVICE:-/dev/usb/lp0}:${ZEBRA_DEVICE:-/dev/usb/lp0}
+    volumes:
+      - gscale_tmp:/tmp/gscale-zebra
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+
+  bot:
+    image: gscale-zebra:local
+    container_name: gscale-bot
+    depends_on:
+      - scale
+    command: ["/app/bin/bot"]
+    working_dir: /app/bot
+    env_file:
+      - ./bot/.env
+    environment:
+      BRIDGE_STATE_FILE: /tmp/gscale-zebra/bridge_state.json
+      PRINTER_DEVICE: ${ZEBRA_DEVICE:-/dev/usb/lp0}
+    devices:
+      - ${ZEBRA_DEVICE:-/dev/usb/lp0}:${ZEBRA_DEVICE:-/dev/usb/lp0}
+    volumes:
+      - gscale_tmp:/tmp/gscale-zebra
+    restart: unless-stopped
+
+volumes:
+  gscale_tmp:

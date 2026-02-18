@@ -1,0 +1,9 @@
+.git
+.gitignore
+
+bot/.env
+
+scale/scale
+zebra/zebra
+
+**/.DS_Store
