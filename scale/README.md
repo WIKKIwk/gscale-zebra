@@ -53,4 +53,3 @@ TUI ichida ham `BATCH: ACTIVE/STOPPED` ko'rinadi.
 - `--no-bot` - bot auto-start ni o'chirish
 - `--bridge-state-file /tmp/gscale-zebra/bridge_state.json` - shared state fayli
 
-`--batch-state-file` hali ishlaydi, lekin deprecated alias.

@@ -29,7 +29,6 @@ type tuiModel struct {
 	zebraUpdates   <-chan ZebraStatus
 	sourceLine     string
 	zebraPreferred string
-	qtyFile        string
 	bridgeStore    *bridgestate.Store
 	batchState     *batchStateReader
 	batchActive    bool
@@ -43,14 +42,13 @@ type tuiModel struct {
 	autoDetector   *corepkg.StableEPCDetector
 }
 
-func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, qtyFile string, bridgeStateFile string, autoWhenNoBatch bool, serialErr error) error {
+func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, bridgeStateFile string, autoWhenNoBatch bool, serialErr error) error {
 	m := tuiModel{
 		ctx:            ctx,
 		updates:        updates,
 		zebraUpdates:   zebraUpdates,
 		sourceLine:     sourceLine,
 		zebraPreferred: zebraPreferred,
-		qtyFile:        qtyFile,
 		bridgeStore:    bridgestate.New(bridgeStateFile),
 		batchState:     newBatchStateReader(bridgeStateFile, autoWhenNoBatch),
 		batchActive:    true,
@@ -145,9 +143,6 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.last = upd
-		if err := writeQtySnapshot(m.qtyFile, upd, m.zebra); err != nil {
-			m.info = "qty snapshot xato: " + err.Error()
-		}
 		if err := writeBridgeStateSnapshot(m.bridgeStore, upd, m.zebra); err != nil {
 			m.info = "bridge snapshot xato: " + err.Error()
 		}
@@ -189,9 +184,6 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			st.UpdatedAt = time.Now()
 		}
 		m.zebra = st
-		if err := writeQtySnapshot(m.qtyFile, m.last, m.zebra); err != nil {
-			m.info = "qty snapshot xato: " + err.Error()
-		}
 		if err := writeBridgeStateSnapshot(m.bridgeStore, m.last, m.zebra); err != nil {
 			m.info = "bridge snapshot xato: " + err.Error()
 		}

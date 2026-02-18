@@ -55,11 +55,6 @@ func Load(envPath string) (Config, error) {
 		BridgeStateFile: firstNonEmpty(
 			os.Getenv("BRIDGE_STATE_FILE"),
 			fileVals["BRIDGE_STATE_FILE"],
-			// backward compatibility aliases
-			os.Getenv("BATCH_STATE_FILE"),
-			fileVals["BATCH_STATE_FILE"],
-			os.Getenv("SCALE_QTY_FILE"),
-			fileVals["SCALE_QTY_FILE"],
 			defaultBridgeStateFile,
 		),
 	}

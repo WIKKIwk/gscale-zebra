@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-const defaultSharedQtyFile = "/tmp/gscale-zebra/qty.json"
 const defaultSharedBridgeStateFile = "/tmp/gscale-zebra/bridge_state.json"
 
 type appConfig struct {
@@ -25,7 +24,6 @@ type appConfig struct {
 	disableZebra    bool
 	botDir          string
 	disableBot      bool
-	qtyFile         string
 	bridgeStateFile string
 }
 
@@ -47,9 +45,7 @@ func parseFlags() (appConfig, error) {
 	flag.BoolVar(&cfg.disableZebra, "no-zebra", false, "disable zebra monitor/actions in TUI")
 	flag.StringVar(&cfg.botDir, "bot-dir", "../bot", "telegram bot module directory")
 	flag.BoolVar(&cfg.disableBot, "no-bot", false, "disable auto-start telegram bot")
-	flag.StringVar(&cfg.qtyFile, "qty-file", defaultSharedQtyFile, "legacy shared qty JSON file")
 	flag.StringVar(&cfg.bridgeStateFile, "bridge-state-file", defaultSharedBridgeStateFile, "shared bridge JSON file for scale+zebra+bot")
-	flag.StringVar(&cfg.bridgeStateFile, "batch-state-file", defaultSharedBridgeStateFile, "deprecated alias of --bridge-state-file")
 	flag.Parse()
 
 	bauds, err := parseBaudList(baudListRaw, preferredBaud)
