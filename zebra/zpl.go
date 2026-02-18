@@ -26,9 +26,8 @@ func BuildTestLabelZPL(message string, copies int) string {
 
 	var b strings.Builder
 	b.WriteString("^XA\n")
-	b.WriteString("^PW560\n")
-	b.WriteString("^LL260\n")
 	b.WriteString("^LH0,0\n")
+	b.WriteString("^MMT\n")
 	b.WriteString("^CF0,36\n")
 	b.WriteString(fmt.Sprintf("^FO28,24^FD%s^FS\n", msg))
 	b.WriteString("^CF0,24\n")
@@ -55,8 +54,6 @@ func BuildRFIDEncodeCommandStream(epc string, copies int, feedAfter bool, printH
 
 	var b strings.Builder
 	b.WriteString("^XA\n")
-	b.WriteString("^PW560\n")
-	b.WriteString("^LL260\n")
 	b.WriteString("^LH0,0\n")
 	if feedAfter {
 		b.WriteString("^MMT\n")
@@ -64,7 +61,7 @@ func BuildRFIDEncodeCommandStream(epc string, copies int, feedAfter bool, printH
 	b.WriteString("^RS8,,,1,N\n")
 	b.WriteString(fmt.Sprintf("^RFW,H,,,A^FD%s^FS\n", norm))
 	if printHuman {
-		b.WriteString("^FO20,24^A0N,22,22^FB520,2,0,L,0\n")
+		b.WriteString("^FO20,24^A0N,22,22^FB520,3,0,L,0\n")
 		b.WriteString(fmt.Sprintf("^FDEPC: %s^FS\n", sanitizeZPLText(norm)))
 	}
 	b.WriteString(fmt.Sprintf("^PQ%d\n", copies))

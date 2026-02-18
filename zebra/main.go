@@ -29,6 +29,10 @@ func main() {
 		if err := runSettings(args); err != nil {
 			exitErr(err)
 		}
+	case "setvar", "set":
+		if err := runSetVar(args); err != nil {
+			exitErr(err)
+		}
 	case "print-test":
 		if err := runPrintTest(args); err != nil {
 			exitErr(err)
