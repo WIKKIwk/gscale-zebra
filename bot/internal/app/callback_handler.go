@@ -40,9 +40,9 @@ func (a *App) handleMaterialIssueCallback(ctx context.Context, q telegram.Callba
 		return a.tg.SendMessage(ctx, chatID, "Avval /batch orqali item va ombor tanlang.")
 	}
 
-	qty, unit, err := a.scale.WaitStablePositive(ctx, 35*time.Second, 220*time.Millisecond)
+	qty, unit, err := a.qtyReader.WaitStablePositive(ctx, 35*time.Second, 220*time.Millisecond)
 	if err != nil {
-		return a.tg.SendMessage(ctx, chatID, "Scale qty olinmadi: "+err.Error())
+		return a.tg.SendMessage(ctx, chatID, "Scale qty olinmadi (fayl): "+err.Error())
 	}
 
 	draft, err := a.erp.CreateMaterialIssueDraft(ctx, erp.MaterialIssueDraftInput{

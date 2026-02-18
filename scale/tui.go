@@ -28,6 +28,7 @@ type tuiModel struct {
 	zebraUpdates   <-chan ZebraStatus
 	sourceLine     string
 	zebraPreferred string
+	qtyFile        string
 	message        string
 	info           string
 	last           Reading
@@ -38,13 +39,14 @@ type tuiModel struct {
 	autoDetector   *corepkg.StableEPCDetector
 }
 
-func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, serialErr error) error {
+func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, qtyFile string, serialErr error) error {
 	m := tuiModel{
 		ctx:            ctx,
 		updates:        updates,
 		zebraUpdates:   zebraUpdates,
 		sourceLine:     sourceLine,
 		zebraPreferred: zebraPreferred,
+		qtyFile:        qtyFile,
 		last:           Reading{Unit: "kg"},
 		message:        "scale oqimi kutilmoqda",
 		info:           "ready",
@@ -113,6 +115,9 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.last = upd
+		if err := writeQtySnapshot(m.qtyFile, upd); err != nil {
+			m.info = "qty snapshot xato: " + err.Error()
+		}
 		if upd.Error != "" {
 			m.message = upd.Error
 		} else {

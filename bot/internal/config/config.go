@@ -10,14 +10,14 @@ import (
 	"strings"
 )
 
-const defaultScaleAPIURL = "http://127.0.0.1:18000/api/v1/scale"
+const defaultScaleQtyFile = "/tmp/gscale-zebra/qty.json"
 
 type Config struct {
 	TelegramBotToken string
 	ERPURL           string
 	ERPAPIKey        string
 	ERPAPISecret     string
-	ScaleAPIURL      string
+	ScaleQtyFile     string
 }
 
 func Load(envPath string) (Config, error) {
@@ -52,10 +52,10 @@ func Load(envPath string) (Config, error) {
 			fileVals["ERP_API_SECRET"],
 			fileVals["API_SECRET"],
 		),
-		ScaleAPIURL: firstNonEmpty(
-			os.Getenv("SCALE_API_URL"),
-			fileVals["SCALE_API_URL"],
-			defaultScaleAPIURL,
+		ScaleQtyFile: firstNonEmpty(
+			os.Getenv("SCALE_QTY_FILE"),
+			fileVals["SCALE_QTY_FILE"],
+			defaultScaleQtyFile,
 		),
 	}
 
@@ -80,18 +80,13 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.ERPAPISecret) == "" {
 		return errors.New("ERP_API_SECRET bo'sh")
 	}
-	if strings.TrimSpace(c.ScaleAPIURL) == "" {
-		return errors.New("SCALE_API_URL bo'sh")
+	if strings.TrimSpace(c.ScaleQtyFile) == "" {
+		return errors.New("SCALE_QTY_FILE bo'sh")
 	}
 
 	u, err := url.Parse(strings.TrimSpace(c.ERPURL))
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return errors.New("ERP_URL noto'g'ri (example: https://erp.accord.uz)")
-	}
-
-	su, err := url.Parse(strings.TrimSpace(c.ScaleAPIURL))
-	if err != nil || su.Scheme == "" || su.Host == "" {
-		return errors.New("SCALE_API_URL noto'g'ri (example: http://127.0.0.1:18000/api/v1/scale)")
 	}
 	return nil
 }

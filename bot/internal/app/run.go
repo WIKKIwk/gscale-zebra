@@ -9,7 +9,7 @@ import (
 )
 
 func (a *App) Run(ctx context.Context) error {
-	a.log.Printf("bot started, ERP=%s scale=%s", a.cfg.ERPURL, a.cfg.ScaleAPIURL)
+	a.log.Printf("bot started, ERP=%s qty_file=%s", a.cfg.ERPURL, a.cfg.ScaleQtyFile)
 	var offset int64
 
 	for {
