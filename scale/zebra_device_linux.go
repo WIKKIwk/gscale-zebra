@@ -118,7 +118,7 @@ func zebraSendRaw(device string, payload []byte) error {
 		return errors.New("zebra: payload bo'sh")
 	}
 
-	fd, err := syscall.Open(device, syscall.O_WRONLY, 0)
+	fd, err := syscall.Open(device, syscall.O_WRONLY|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		return fmt.Errorf("zebra: device ochilmadi: %w", err)
 	}
@@ -169,7 +169,7 @@ func zebraTransceiveRaw(device string, payload []byte, timeout time.Duration) ([
 		timeout = 1200 * time.Millisecond
 	}
 
-	fd, err := syscall.Open(device, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
+	fd, err := syscall.Open(device, syscall.O_RDWR|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		if err := zebraSendRaw(device, payload); err != nil {
 			return nil, err

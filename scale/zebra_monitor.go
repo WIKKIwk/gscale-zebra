@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
 var zebraHexOnlyRegex = regexp.MustCompile(`^[0-9A-F]+$`)
+var zebraIOMutex sync.Mutex
 
 type ZebraStatus struct {
 	Connected   bool
@@ -54,6 +56,8 @@ func startZebraMonitor(ctx context.Context, preferredDevice string, interval tim
 }
 
 func collectZebraStatus(preferredDevice string, timeout time.Duration) ZebraStatus {
+	zebraIOMutex.Lock()
+	defer zebraIOMutex.Unlock()
 	st := ZebraStatus{
 		Connected: false,
 		Verify:    "-",
@@ -78,6 +82,8 @@ func collectZebraStatus(preferredDevice string, timeout time.Duration) ZebraStat
 }
 
 func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
+	zebraIOMutex.Lock()
+	defer zebraIOMutex.Unlock()
 	st := ZebraStatus{
 		Action:    "read",
 		Verify:    "-",
@@ -104,6 +110,8 @@ func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
 }
 
 func runZebraEncodeAndRead(preferredDevice, epc, qtyText string, timeout time.Duration) ZebraStatus {
+	zebraIOMutex.Lock()
+	defer zebraIOMutex.Unlock()
 	st := ZebraStatus{
 		Action:    "encode",
 		Verify:    "-",
@@ -150,7 +158,10 @@ func encodeAndVerify(device, epc, qtyText string, timeout time.Duration) (string
 	if err != nil {
 		return "", "", "UNKNOWN", err
 	}
-	if err := sendRawRetry(device, []byte(stream), 5, 120*time.Millisecond); err != nil {
+	if err := sendRawRetry(device, []byte(stream), 18, 140*time.Millisecond); err != nil {
+		if isBusyLikeError(err) {
+			return "", "", "UNKNOWN", fmt.Errorf("%w (printer busy: boshqa process /dev/usb/lp0 ni band qilgan)", err)
+		}
 		return "", "", "UNKNOWN", err
 	}
 	time.Sleep(820 * time.Millisecond)
