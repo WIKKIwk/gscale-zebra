@@ -54,7 +54,7 @@ func BuildImageLabelZPL(src image.Image, labelWidth, labelHeight int) ([]byte, e
 
 	hexData := strings.ToUpper(hex.EncodeToString(bitmap))
 	zpl := fmt.Sprintf(
-		"^XA\n^PW%d\n^LL%d\n^LH0,0\n^FO%d,%d^GFA,%d,%d,%d,%s^FS\n^PQ1,0,1,N\n^XZ\n",
+		"^XA\n^MMT\n^PW%d\n^LL%d\n^LH0,0\n^FO%d,%d^GFA,%d,%d,%d,%s^FS\n^PQ1,0,1,N\n^XZ\n",
 		labelWidth,
 		labelHeight,
 		x,
