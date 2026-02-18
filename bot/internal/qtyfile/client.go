@@ -21,7 +21,15 @@ type snapshot struct {
 	Unit      string   `json:"unit"`
 	Stable    *bool    `json:"stable"`
 	Error     string   `json:"error"`
+	EPC       string   `json:"epc"`
+	EPCAt     string   `json:"epc_updated_at"`
 	UpdatedAt string   `json:"updated_at"`
+}
+
+type StableReading struct {
+	Qty       float64
+	Unit      string
+	UpdatedAt time.Time
 }
 
 func New(path string) *Client {
@@ -29,8 +37,16 @@ func New(path string) *Client {
 }
 
 func (c *Client) WaitStablePositive(ctx context.Context, timeout, pollInterval time.Duration) (float64, string, error) {
+	r, err := c.WaitStablePositiveReading(ctx, timeout, pollInterval)
+	if err != nil {
+		return 0, "", err
+	}
+	return r.Qty, r.Unit, nil
+}
+
+func (c *Client) WaitStablePositiveReading(ctx context.Context, timeout, pollInterval time.Duration) (StableReading, error) {
 	if c == nil || strings.TrimSpace(c.path) == "" {
-		return 0, "", fmt.Errorf("qty file path bo'sh")
+		return StableReading{}, fmt.Errorf("qty file path bo'sh")
 	}
 	if timeout <= 0 {
 		timeout = 30 * time.Second
@@ -46,11 +62,11 @@ func (c *Client) WaitStablePositive(ctx context.Context, timeout, pollInterval t
 
 	for {
 		if time.Now().After(deadline) {
-			return 0, "", fmt.Errorf("scale qty timeout (%s)", timeout)
+			return StableReading{}, fmt.Errorf("scale qty timeout (%s)", timeout)
 		}
 		select {
 		case <-ctx.Done():
-			return 0, "", ctx.Err()
+			return StableReading{}, ctx.Err()
 		default:
 		}
 
@@ -71,14 +87,15 @@ func (c *Client) WaitStablePositive(ctx context.Context, timeout, pollInterval t
 			time.Sleep(pollInterval)
 			continue
 		}
-		if !isFreshSnapshot(s.UpdatedAt, 4*time.Second) {
+		updatedAt, ok := parseSnapshotTime(s.UpdatedAt)
+		if !ok || !isFreshTime(updatedAt, 4*time.Second) {
 			time.Sleep(pollInterval)
 			continue
 		}
 
 		w := *s.Weight
 		if s.Stable != nil && *s.Stable {
-			return w, normalizeUnit(s.Unit), nil
+			return StableReading{Qty: w, Unit: normalizeUnit(s.Unit), UpdatedAt: updatedAt}, nil
 		}
 
 		if haveLast && almostEqual(lastWeight, w, 0.001) {
@@ -90,9 +107,60 @@ func (c *Client) WaitStablePositive(ctx context.Context, timeout, pollInterval t
 		lastWeight = w
 
 		if stableCount >= 4 {
-			return w, normalizeUnit(s.Unit), nil
+			return StableReading{Qty: w, Unit: normalizeUnit(s.Unit), UpdatedAt: updatedAt}, nil
 		}
 		time.Sleep(pollInterval)
+	}
+}
+
+func (c *Client) WaitEPCForReading(ctx context.Context, timeout, pollInterval time.Duration, after time.Time, lastEPC string) (string, error) {
+	if c == nil || strings.TrimSpace(c.path) == "" {
+		return "", fmt.Errorf("qty file path bo'sh")
+	}
+	if timeout <= 0 {
+		timeout = 6 * time.Second
+	}
+	if pollInterval <= 0 {
+		pollInterval = 140 * time.Millisecond
+	}
+	lastEPC = strings.ToUpper(strings.TrimSpace(lastEPC))
+
+	deadline := time.Now().Add(timeout)
+	for {
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("epc timeout (%s)", timeout)
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
+		}
+
+		s, err := c.readSnapshot()
+		if err != nil {
+			time.Sleep(pollInterval)
+			continue
+		}
+
+		epc := strings.ToUpper(strings.TrimSpace(s.EPC))
+		if epc == "" || epc == lastEPC {
+			time.Sleep(pollInterval)
+			continue
+		}
+
+		epcAt, ok := parseSnapshotTime(s.EPCAt)
+		if ok {
+			if !isFreshTime(epcAt, 15*time.Second) {
+				time.Sleep(pollInterval)
+				continue
+			}
+			if !after.IsZero() && epcAt.Before(after.Add(-300*time.Millisecond)) {
+				time.Sleep(pollInterval)
+				continue
+			}
+		}
+
+		return epc, nil
 	}
 }
 
@@ -154,14 +222,26 @@ func (c *Client) readSnapshot() (snapshot, error) {
 }
 
 func isFreshSnapshot(updated string, maxAge time.Duration) bool {
+	ts, ok := parseSnapshotTime(updated)
+	if !ok {
+		return false
+	}
+	return isFreshTime(ts, maxAge)
+}
+
+func parseSnapshotTime(updated string) (time.Time, bool) {
 	updated = strings.TrimSpace(updated)
 	if updated == "" {
-		return false
+		return time.Time{}, false
 	}
 	ts, err := time.Parse(time.RFC3339Nano, updated)
 	if err != nil {
-		return false
+		return time.Time{}, false
 	}
+	return ts, true
+}
+
+func isFreshTime(ts time.Time, maxAge time.Duration) bool {
 	age := time.Since(ts)
 	if age < 0 {
 		age = 0

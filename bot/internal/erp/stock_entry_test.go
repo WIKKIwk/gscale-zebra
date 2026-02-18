@@ -23,6 +23,7 @@ func TestCreateMaterialIssueDraft(t *testing.T) {
 			UOM        string  `json:"uom"`
 			StockUOM   string  `json:"stock_uom"`
 			Conversion float64 `json:"conversion_factor"`
+			Barcode    string  `json:"barcode"`
 		} `json:"items"`
 	}
 
@@ -57,6 +58,9 @@ func TestCreateMaterialIssueDraft(t *testing.T) {
 			if p.Items[0].ItemCode != "ITEM-1" || p.Items[0].Warehouse != "Stores - A" || p.Items[0].Qty != 2.5 {
 				t.Fatalf("item payload mismatch: %+v", p.Items[0])
 			}
+			if p.Items[0].Barcode != "3034257BF7194E406994036B" {
+				t.Fatalf("item barcode mismatch: %+v", p.Items[0])
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"data":{"name":"MAT-STE-2026-00001"}}`))
 			return
@@ -71,6 +75,7 @@ func TestCreateMaterialIssueDraft(t *testing.T) {
 		ItemCode:  "ITEM-1",
 		Warehouse: "Stores - A",
 		Qty:       2.5,
+		Barcode:   "3034257BF7194E406994036B",
 	})
 	if err != nil {
 		t.Fatalf("CreateMaterialIssueDraft error: %v", err)
@@ -80,6 +85,9 @@ func TestCreateMaterialIssueDraft(t *testing.T) {
 	}
 	if draft.UOM != "Kg" {
 		t.Fatalf("draft uom mismatch: %q", draft.UOM)
+	}
+	if draft.Barcode != "3034257BF7194E406994036B" {
+		t.Fatalf("draft barcode mismatch: %q", draft.Barcode)
 	}
 }
 

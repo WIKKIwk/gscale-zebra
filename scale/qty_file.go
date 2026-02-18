@@ -16,10 +16,13 @@ type qtySnapshot struct {
 	Unit      string   `json:"unit"`
 	Stable    *bool    `json:"stable"`
 	Error     string   `json:"error,omitempty"`
+	EPC       string   `json:"epc,omitempty"`
+	EPCVerify string   `json:"epc_verify,omitempty"`
+	EPCAt     string   `json:"epc_updated_at,omitempty"`
 	UpdatedAt string   `json:"updated_at"`
 }
 
-func writeQtySnapshot(path string, rd Reading) error {
+func writeQtySnapshot(path string, rd Reading, zebra ZebraStatus) error {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return nil
@@ -41,6 +44,15 @@ func writeQtySnapshot(path string, rd Reading) error {
 	}
 	if snap.Unit == "" {
 		snap.Unit = "kg"
+	}
+	if epc := strings.ToUpper(strings.TrimSpace(zebra.LastEPC)); epc != "" {
+		snap.EPC = epc
+		snap.EPCVerify = strings.ToUpper(strings.TrimSpace(zebra.Verify))
+		zts := zebra.UpdatedAt
+		if zts.IsZero() {
+			zts = ts
+		}
+		snap.EPCAt = zts.UTC().Format(time.RFC3339Nano)
 	}
 
 	b, err := json.Marshal(snap)

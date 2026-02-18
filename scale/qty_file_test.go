@@ -21,7 +21,7 @@ func TestWriteQtySnapshot(t *testing.T) {
 		Unit:      "kg",
 		Stable:    &st,
 		UpdatedAt: time.Now(),
-	})
+	}, ZebraStatus{LastEPC: "3034ABCDEF1234567890AA", Verify: "MATCH", UpdatedAt: time.Now()})
 	if err != nil {
 		t.Fatalf("writeQtySnapshot error: %v", err)
 	}
@@ -40,5 +40,8 @@ func TestWriteQtySnapshot(t *testing.T) {
 	}
 	if got["weight"] == nil {
 		t.Fatalf("weight missing")
+	}
+	if got["epc"] != "3034ABCDEF1234567890AA" {
+		t.Fatalf("epc mismatch: %v", got["epc"])
 	}
 }

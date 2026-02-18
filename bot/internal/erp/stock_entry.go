@@ -15,6 +15,7 @@ type MaterialIssueDraftInput struct {
 	ItemCode  string
 	Warehouse string
 	Qty       float64
+	Barcode   string
 }
 
 type StockEntryDraft struct {
@@ -23,6 +24,7 @@ type StockEntryDraft struct {
 	Warehouse string
 	Qty       float64
 	UOM       string
+	Barcode   string
 }
 
 type warehouseLookupResponse struct {
@@ -48,6 +50,7 @@ type createStockEntryResponse struct {
 func (c *Client) CreateMaterialIssueDraft(ctx context.Context, in MaterialIssueDraftInput) (StockEntryDraft, error) {
 	in.ItemCode = strings.TrimSpace(in.ItemCode)
 	in.Warehouse = strings.TrimSpace(in.Warehouse)
+	in.Barcode = strings.ToUpper(strings.TrimSpace(in.Barcode))
 	if in.ItemCode == "" {
 		return StockEntryDraft{}, fmt.Errorf("item code bo'sh")
 	}
@@ -71,20 +74,23 @@ func (c *Client) CreateMaterialIssueDraft(ctx context.Context, in MaterialIssueD
 		uom = "Kg"
 	}
 
+	item := map[string]any{
+		"item_code":         in.ItemCode,
+		"s_warehouse":       in.Warehouse,
+		"qty":               in.Qty,
+		"uom":               uom,
+		"stock_uom":         uom,
+		"conversion_factor": 1,
+	}
+	if in.Barcode != "" {
+		item["barcode"] = in.Barcode
+	}
+
 	payload := map[string]any{
 		"stock_entry_type": "Material Issue",
 		"company":          company,
 		"from_warehouse":   in.Warehouse,
-		"items": []map[string]any{
-			{
-				"item_code":         in.ItemCode,
-				"s_warehouse":       in.Warehouse,
-				"qty":               in.Qty,
-				"uom":               uom,
-				"stock_uom":         uom,
-				"conversion_factor": 1,
-			},
-		},
+		"items":            []map[string]any{item},
 	}
 
 	body, _ := json.Marshal(payload)
@@ -121,6 +127,7 @@ func (c *Client) CreateMaterialIssueDraft(ctx context.Context, in MaterialIssueD
 		Warehouse: in.Warehouse,
 		Qty:       in.Qty,
 		UOM:       uom,
+		Barcode:   in.Barcode,
 	}, nil
 }
 

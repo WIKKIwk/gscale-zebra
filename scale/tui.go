@@ -115,7 +115,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.last = upd
-		if err := writeQtySnapshot(m.qtyFile, upd); err != nil {
+		if err := writeQtySnapshot(m.qtyFile, upd, m.zebra); err != nil {
 			m.info = "qty snapshot xato: " + err.Error()
 		}
 		if upd.Error != "" {
@@ -139,10 +139,19 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case zebraMsg:
 		st := msg.status
+		if strings.TrimSpace(st.LastEPC) == "" && strings.TrimSpace(m.zebra.LastEPC) != "" {
+			st.LastEPC = m.zebra.LastEPC
+			if strings.TrimSpace(st.Verify) == "" || strings.TrimSpace(st.Verify) == "-" {
+				st.Verify = m.zebra.Verify
+			}
+		}
 		if st.UpdatedAt.IsZero() {
 			st.UpdatedAt = time.Now()
 		}
 		m.zebra = st
+		if err := writeQtySnapshot(m.qtyFile, m.last, m.zebra); err != nil {
+			m.info = "qty snapshot xato: " + err.Error()
+		}
 		if st.Action != "" {
 			m.info = zebraActionSummary(st)
 		}
