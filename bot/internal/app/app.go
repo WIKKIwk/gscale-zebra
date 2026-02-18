@@ -67,6 +67,13 @@ func (a *App) Run(ctx context.Context) error {
 				continue
 			}
 
+			if upd.CallbackQuery != nil {
+				if err := commands.HandleCallbackQuery(ctx, a.deps(), *upd.CallbackQuery); err != nil {
+					a.log.Printf("handleCallbackQuery error: %v", err)
+				}
+				continue
+			}
+
 			if upd.Message == nil {
 				continue
 			}
@@ -81,6 +88,10 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 	text := strings.TrimSpace(msg.Text)
 	if text == "" {
 		return nil
+	}
+
+	if itemCode, warehouse, ok := commands.ExtractSelectedWarehouse(text); ok {
+		return commands.HandleWarehouseSelected(ctx, a.deps(), msg.Chat.ID, itemCode, warehouse)
 	}
 
 	if itemCode, ok := commands.ExtractSelectedItemCode(text); ok {

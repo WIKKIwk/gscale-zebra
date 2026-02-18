@@ -12,6 +12,7 @@ type TelegramService interface {
 	SendMessageWithInlineKeyboard(ctx context.Context, chatID int64, text string, keyboard *telegram.InlineKeyboardMarkup) error
 	SendMessageWithInlineKeyboardAndReturnID(ctx context.Context, chatID int64, text string, keyboard *telegram.InlineKeyboardMarkup) (int64, error)
 	AnswerInlineQuery(ctx context.Context, inlineQueryID string, results []telegram.InlineQueryResultArticle, cacheSeconds int) error
+	AnswerCallbackQuery(ctx context.Context, callbackQueryID, text string) error
 }
 
 type ERPService interface {

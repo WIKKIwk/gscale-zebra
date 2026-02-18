@@ -37,9 +37,10 @@ type sendMessageResponse struct {
 }
 
 type Update struct {
-	UpdateID    int64        `json:"update_id"`
-	Message     *Message     `json:"message"`
-	InlineQuery *InlineQuery `json:"inline_query"`
+	UpdateID      int64          `json:"update_id"`
+	Message       *Message       `json:"message"`
+	InlineQuery   *InlineQuery   `json:"inline_query"`
+	CallbackQuery *CallbackQuery `json:"callback_query"`
 }
 
 type Message struct {
@@ -54,6 +55,13 @@ type InlineQuery struct {
 	Query  string `json:"query"`
 	Offset string `json:"offset"`
 	From   User   `json:"from"`
+}
+
+type CallbackQuery struct {
+	ID      string   `json:"id"`
+	From    User     `json:"from"`
+	Message *Message `json:"message"`
+	Data    string   `json:"data"`
 }
 
 type Chat struct {
@@ -72,7 +80,8 @@ type InlineKeyboardMarkup struct {
 
 type InlineKeyboardButton struct {
 	Text                         string `json:"text"`
-	SwitchInlineQueryCurrentChat string `json:"switch_inline_query_current_chat"`
+	SwitchInlineQueryCurrentChat string `json:"switch_inline_query_current_chat,omitempty"`
+	CallbackData                 string `json:"callback_data,omitempty"`
 }
 
 type InlineQueryResultArticle struct {
@@ -99,7 +108,7 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64, timeoutSec int) (
 	q := url.Values{}
 	q.Set("offset", strconv.FormatInt(offset, 10))
 	q.Set("timeout", strconv.Itoa(timeoutSec))
-	q.Set("allowed_updates", `["message","inline_query"]`)
+	q.Set("allowed_updates", `["message","inline_query","callback_query"]`)
 
 	u := fmt.Sprintf("%s/bot%s/getUpdates?%s", c.baseURL, c.token, q.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
@@ -176,6 +185,15 @@ func (c *Client) AnswerInlineQuery(ctx context.Context, inlineQueryID string, re
 	form.Set("cache_time", strconv.Itoa(cacheSeconds))
 	form.Set("is_personal", "true")
 	return c.callAPI(ctx, "answerInlineQuery", form)
+}
+
+func (c *Client) AnswerCallbackQuery(ctx context.Context, callbackQueryID, text string) error {
+	form := url.Values{}
+	form.Set("callback_query_id", strings.TrimSpace(callbackQueryID))
+	if strings.TrimSpace(text) != "" {
+		form.Set("text", strings.TrimSpace(text))
+	}
+	return c.callAPI(ctx, "answerCallbackQuery", form)
 }
 
 func (c *Client) callSendMessage(ctx context.Context, form url.Values) (int64, error) {
