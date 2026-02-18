@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	maxEncodeAttempts = 3
-	readVerifyRetries = 3
+	maxEncodeAttempts = 1
+	readVerifyRetries = 1
 )
 
 func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
