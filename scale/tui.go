@@ -1,6 +1,7 @@
 package main
 
 import (
+	bridgestate "bridge/state"
 	"context"
 	corepkg "core"
 	"fmt"
@@ -29,6 +30,7 @@ type tuiModel struct {
 	sourceLine     string
 	zebraPreferred string
 	qtyFile        string
+	bridgeStore    *bridgestate.Store
 	batchState     *batchStateReader
 	batchActive    bool
 	message        string
@@ -41,7 +43,7 @@ type tuiModel struct {
 	autoDetector   *corepkg.StableEPCDetector
 }
 
-func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, qtyFile string, batchStateFile string, autoWhenNoBatch bool, serialErr error) error {
+func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan ZebraStatus, sourceLine string, zebraPreferred string, qtyFile string, bridgeStateFile string, autoWhenNoBatch bool, serialErr error) error {
 	m := tuiModel{
 		ctx:            ctx,
 		updates:        updates,
@@ -49,7 +51,8 @@ func runTUI(ctx context.Context, updates <-chan Reading, zebraUpdates <-chan Zeb
 		sourceLine:     sourceLine,
 		zebraPreferred: zebraPreferred,
 		qtyFile:        qtyFile,
-		batchState:     newBatchStateReader(batchStateFile, autoWhenNoBatch),
+		bridgeStore:    bridgestate.New(bridgeStateFile),
+		batchState:     newBatchStateReader(bridgeStateFile, autoWhenNoBatch),
 		batchActive:    true,
 		last:           Reading{Unit: "kg"},
 		message:        "scale oqimi kutilmoqda",
@@ -145,6 +148,9 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if err := writeQtySnapshot(m.qtyFile, upd, m.zebra); err != nil {
 			m.info = "qty snapshot xato: " + err.Error()
 		}
+		if err := writeBridgeStateSnapshot(m.bridgeStore, upd, m.zebra); err != nil {
+			m.info = "bridge snapshot xato: " + err.Error()
+		}
 		if upd.Error != "" {
 			m.message = upd.Error
 		} else {
@@ -185,6 +191,9 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.zebra = st
 		if err := writeQtySnapshot(m.qtyFile, m.last, m.zebra); err != nil {
 			m.info = "qty snapshot xato: " + err.Error()
+		}
+		if err := writeBridgeStateSnapshot(m.bridgeStore, m.last, m.zebra); err != nil {
+			m.info = "bridge snapshot xato: " + err.Error()
 		}
 		if st.Action != "" {
 			m.info = zebraActionSummary(st)

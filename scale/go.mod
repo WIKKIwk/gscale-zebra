@@ -3,6 +3,7 @@ module scale
 go 1.25.7
 
 require (
+	bridge v0.0.0
 	core v0.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -29,4 +30,5 @@ require (
 	golang.org/x/text v0.3.8 // indirect
 )
 
+replace bridge => ../bridge
 replace core => ../core

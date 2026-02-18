@@ -7,9 +7,9 @@ import (
 
 	"bot/internal/app/commands"
 	"bot/internal/batchstate"
+	"bot/internal/bridgeclient"
 	"bot/internal/config"
 	"bot/internal/erp"
-	"bot/internal/qtyfile"
 	"bot/internal/telegram"
 )
 
@@ -17,7 +17,7 @@ type App struct {
 	cfg                      config.Config
 	tg                       *telegram.Client
 	erp                      *erp.Client
-	qtyReader                *qtyfile.Client
+	qtyReader                *bridgeclient.Client
 	batchState               *batchstate.Store
 	log                      *log.Logger
 	startInfoMsgByChat       map[int64]int64
@@ -48,8 +48,8 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		cfg:                      cfg,
 		tg:                       telegram.New(cfg.TelegramBotToken),
 		erp:                      erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
-		qtyReader:                qtyfile.New(cfg.ScaleQtyFile),
-		batchState:               batchstate.New(cfg.BatchStateFile),
+		qtyReader:                bridgeclient.New(cfg.BridgeStateFile),
+		batchState:               batchstate.New(cfg.BridgeStateFile),
 		log:                      logger,
 		startInfoMsgByChat:       make(map[int64]int64),
 		batchPromptMsgByChat:     make(map[int64]int64),

@@ -16,8 +16,8 @@ func TestBatchStateReader_DefaultWhenMissing(t *testing.T) {
 
 func TestBatchStateReader_ReadsActive(t *testing.T) {
 	d := t.TempDir()
-	p := filepath.Join(d, "batch_state.json")
-	if err := os.WriteFile(p, []byte(`{"active":true}`), 0o644); err != nil {
+	p := filepath.Join(d, "bridge_state.json")
+	if err := os.WriteFile(p, []byte(`{"batch":{"active":true,"updated_at":"2026-02-18T00:00:00Z"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	r := newBatchStateReader(p, false)

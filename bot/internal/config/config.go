@@ -10,16 +10,14 @@ import (
 	"strings"
 )
 
-const defaultScaleQtyFile = "/tmp/gscale-zebra/qty.json"
-const defaultBatchStateFile = "/tmp/gscale-zebra/batch_state.json"
+const defaultBridgeStateFile = "/tmp/gscale-zebra/bridge_state.json"
 
 type Config struct {
 	TelegramBotToken string
 	ERPURL           string
 	ERPAPIKey        string
 	ERPAPISecret     string
-	ScaleQtyFile     string
-	BatchStateFile   string
+	BridgeStateFile  string
 }
 
 func Load(envPath string) (Config, error) {
@@ -54,15 +52,15 @@ func Load(envPath string) (Config, error) {
 			fileVals["ERP_API_SECRET"],
 			fileVals["API_SECRET"],
 		),
-		ScaleQtyFile: firstNonEmpty(
-			os.Getenv("SCALE_QTY_FILE"),
-			fileVals["SCALE_QTY_FILE"],
-			defaultScaleQtyFile,
-		),
-		BatchStateFile: firstNonEmpty(
+		BridgeStateFile: firstNonEmpty(
+			os.Getenv("BRIDGE_STATE_FILE"),
+			fileVals["BRIDGE_STATE_FILE"],
+			// backward compatibility aliases
 			os.Getenv("BATCH_STATE_FILE"),
 			fileVals["BATCH_STATE_FILE"],
-			defaultBatchStateFile,
+			os.Getenv("SCALE_QTY_FILE"),
+			fileVals["SCALE_QTY_FILE"],
+			defaultBridgeStateFile,
 		),
 	}
 
@@ -87,11 +85,8 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.ERPAPISecret) == "" {
 		return errors.New("ERP_API_SECRET bo'sh")
 	}
-	if strings.TrimSpace(c.ScaleQtyFile) == "" {
-		return errors.New("SCALE_QTY_FILE bo'sh")
-	}
-	if strings.TrimSpace(c.BatchStateFile) == "" {
-		return errors.New("BATCH_STATE_FILE bo'sh")
+	if strings.TrimSpace(c.BridgeStateFile) == "" {
+		return errors.New("BRIDGE_STATE_FILE bo'sh")
 	}
 
 	u, err := url.Parse(strings.TrimSpace(c.ERPURL))

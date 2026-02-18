@@ -1,0 +1,39 @@
+package state
+
+type Snapshot struct {
+	Scale     ScaleSnapshot `json:"scale"`
+	Zebra     ZebraSnapshot `json:"zebra"`
+	Batch     BatchSnapshot `json:"batch"`
+	UpdatedAt string        `json:"updated_at,omitempty"`
+}
+
+type ScaleSnapshot struct {
+	Source    string   `json:"source,omitempty"`
+	Port      string   `json:"port,omitempty"`
+	Weight    *float64 `json:"weight"`
+	Unit      string   `json:"unit,omitempty"`
+	Stable    *bool    `json:"stable"`
+	Error     string   `json:"error,omitempty"`
+	UpdatedAt string   `json:"updated_at,omitempty"`
+}
+
+type ZebraSnapshot struct {
+	Connected   bool   `json:"connected"`
+	DevicePath  string `json:"device_path,omitempty"`
+	Name        string `json:"name,omitempty"`
+	DeviceState string `json:"device_state,omitempty"`
+	MediaState  string `json:"media_state,omitempty"`
+	ReadLine1   string `json:"read_line1,omitempty"`
+	ReadLine2   string `json:"read_line2,omitempty"`
+	LastEPC     string `json:"last_epc,omitempty"`
+	Verify      string `json:"verify,omitempty"`
+	Action      string `json:"action,omitempty"`
+	Error       string `json:"error,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
+}
+
+type BatchSnapshot struct {
+	Active    bool   `json:"active"`
+	ChatID    int64  `json:"chat_id,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}

@@ -1,37 +1,31 @@
 package batchstate
 
 import (
-	"encoding/json"
-	"os"
+	bridgestate "bridge/state"
 	"path/filepath"
 	"testing"
 )
 
 func TestSetWritesSnapshot(t *testing.T) {
 	d := t.TempDir()
-	p := filepath.Join(d, "batch_state.json")
+	p := filepath.Join(d, "bridge_state.json")
 
 	s := New(p)
 	if err := s.Set(true, 123); err != nil {
 		t.Fatalf("Set error: %v", err)
 	}
 
-	b, err := os.ReadFile(p)
+	got, err := bridgestate.New(p).Read()
 	if err != nil {
-		t.Fatalf("read error: %v", err)
+		t.Fatalf("Read error: %v", err)
 	}
-
-	var got map[string]any
-	if err := json.Unmarshal(b, &got); err != nil {
-		t.Fatalf("unmarshal error: %v", err)
+	if !got.Batch.Active {
+		t.Fatalf("active mismatch: %v", got.Batch.Active)
 	}
-	if got["active"] != true {
-		t.Fatalf("active mismatch: %v", got["active"])
+	if got.Batch.ChatID != 123 {
+		t.Fatalf("chat_id mismatch: %v", got.Batch.ChatID)
 	}
-	if got["chat_id"] != float64(123) {
-		t.Fatalf("chat_id mismatch: %v", got["chat_id"])
-	}
-	if got["updated_at"] == nil || got["updated_at"] == "" {
+	if got.Batch.UpdatedAt == "" {
 		t.Fatalf("updated_at missing")
 	}
 }

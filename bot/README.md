@@ -22,15 +22,15 @@ go run ./cmd/bot
   - Tugma bosilganda current chat'da Telegram inline menu ochiladi.
   - Inline query natijalarida ERPNext'dagi itemlar chiqadi.
 
-## Batch state
+## Bridge state
 
-Bot batch session holatini shared faylga yozadi:
+Bot batch session holatini shared bridge faylga yozadi:
 
-- default: `/tmp/gscale-zebra/batch_state.json`
-- `.env`: `BATCH_STATE_FILE=...`
+- default: `/tmp/gscale-zebra/bridge_state.json`
+- `.env`: `BRIDGE_STATE_FILE=...`
 
-`Material Issue` bosilganda `active=true`, `Batch Stop` bosilganda `active=false` bo'ladi.
-Scale TUI shu fayl orqali auto printni boshqaradi.
+`Material Issue` bosilganda `batch.active=true`, `Batch Stop` bosilganda `batch.active=false` bo'ladi.
+Scale TUI shu holatga qarab auto printni yoqadi/o'chiradi.
 
 ## Eslatma
 
