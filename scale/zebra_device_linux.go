@@ -111,6 +111,12 @@ func readTrimFile(path string) string {
 }
 
 func zebraSendRaw(device string, payload []byte) error {
+	return withZebraGlobalLock(5*time.Second, func() error {
+		return zebraSendRawUnlocked(device, payload)
+	})
+}
+
+func zebraSendRawUnlocked(device string, payload []byte) error {
 	if strings.TrimSpace(device) == "" {
 		return errors.New("zebra: device bo'sh")
 	}
@@ -169,9 +175,30 @@ func zebraTransceiveRaw(device string, payload []byte, timeout time.Duration) ([
 		timeout = 1200 * time.Millisecond
 	}
 
+	lockTimeout := timeout + 2*time.Second
+	var out []byte
+	err := withZebraGlobalLock(lockTimeout, func() error {
+		resp, err := zebraTransceiveRawUnlocked(device, payload, timeout)
+		if err != nil {
+			return err
+		}
+		out = resp
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func zebraTransceiveRawUnlocked(device string, payload []byte, timeout time.Duration) ([]byte, error) {
+	if timeout <= 0 {
+		timeout = 1200 * time.Millisecond
+	}
+
 	fd, err := syscall.Open(device, syscall.O_RDWR|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
 	if err != nil {
-		if err := zebraSendRaw(device, payload); err != nil {
+		if err := zebraSendRawUnlocked(device, payload); err != nil {
 			return nil, err
 		}
 		return nil, errors.New("zebra: R/W open bo'lmadi; query yuborildi")

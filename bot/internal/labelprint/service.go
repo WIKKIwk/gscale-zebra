@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -13,6 +14,7 @@ import (
 const defaultPrinterDevice = "/dev/usb/lp0"
 const defaultLabelWidthDots = 560
 const defaultLabelHeightDots = 320
+const printerGlobalLockPath = "/tmp/gscale-zebra/zebra.lock"
 
 type Service struct {
 	devicePath  string
@@ -104,27 +106,65 @@ func writeRaw(device string, payload []byte) error {
 		return fmt.Errorf("print payload bo'sh")
 	}
 
-	f, err := os.OpenFile(device, os.O_WRONLY, 0)
+	return withPrinterGlobalLock(8*time.Second, func() error {
+		f, err := os.OpenFile(device, os.O_WRONLY, 0)
+		if err != nil {
+			return fmt.Errorf("device ochilmadi: %w", err)
+		}
+		defer f.Close()
+
+		written := 0
+		for written < len(payload) {
+			n, werr := f.Write(payload[written:])
+			if n > 0 {
+				written += n
+			}
+			if werr != nil {
+				return fmt.Errorf("yozib bo'lmadi: %w", werr)
+			}
+			if n == 0 {
+				return fmt.Errorf("yozib bo'lmadi: 0 byte")
+			}
+		}
+
+		return nil
+	})
+}
+
+func withPrinterGlobalLock(timeout time.Duration, fn func() error) error {
+	if timeout <= 0 {
+		timeout = 2 * time.Second
+	}
+
+	if err := os.MkdirAll(filepath.Dir(printerGlobalLockPath), 0o755); err != nil {
+		return fmt.Errorf("lock dir ochilmadi: %w", err)
+	}
+
+	f, err := os.OpenFile(printerGlobalLockPath, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
-		return fmt.Errorf("device ochilmadi: %w", err)
+		return fmt.Errorf("lock file ochilmadi: %w", err)
 	}
 	defer f.Close()
 
-	written := 0
-	for written < len(payload) {
-		n, werr := f.Write(payload[written:])
-		if n > 0 {
-			written += n
+	deadline := time.Now().Add(timeout)
+	for {
+		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			break
 		}
-		if werr != nil {
-			return fmt.Errorf("yozib bo'lmadi: %w", werr)
+		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+			return fmt.Errorf("lock xato: %w", err)
 		}
-		if n == 0 {
-			return fmt.Errorf("yozib bo'lmadi: 0 byte")
+		if time.Now().After(deadline) {
+			return fmt.Errorf("lock timeout")
 		}
+		time.Sleep(25 * time.Millisecond)
 	}
+	defer func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	}()
 
-	return nil
+	return fn()
 }
 
 func isRetryablePrinterErr(err error) bool {
