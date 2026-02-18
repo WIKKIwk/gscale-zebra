@@ -13,12 +13,13 @@ import (
 )
 
 type App struct {
-	cfg                  config.Config
-	tg                   *telegram.Client
-	erp                  *erp.Client
-	log                  *log.Logger
-	startInfoMsgByChat   map[int64]int64
-	batchPromptMsgByChat map[int64]int64
+	cfg                      config.Config
+	tg                       *telegram.Client
+	erp                      *erp.Client
+	log                      *log.Logger
+	startInfoMsgByChat       map[int64]int64
+	batchPromptMsgByChat     map[int64]int64
+	warehousePromptMsgByChat map[int64]int64
 }
 
 func New(cfg config.Config, logger *log.Logger) *App {
@@ -26,12 +27,13 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		logger = log.Default()
 	}
 	return &App{
-		cfg:                  cfg,
-		tg:                   telegram.New(cfg.TelegramBotToken),
-		erp:                  erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
-		log:                  logger,
-		startInfoMsgByChat:   make(map[int64]int64),
-		batchPromptMsgByChat: make(map[int64]int64),
+		cfg:                      cfg,
+		tg:                       telegram.New(cfg.TelegramBotToken),
+		erp:                      erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
+		log:                      logger,
+		startInfoMsgByChat:       make(map[int64]int64),
+		batchPromptMsgByChat:     make(map[int64]int64),
+		warehousePromptMsgByChat: make(map[int64]int64),
 	}
 }
 
@@ -93,13 +95,20 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 	}
 
 	if itemCode, warehouse, ok := commands.ExtractSelectedWarehouse(text); ok {
-		return commands.HandleWarehouseSelected(ctx, a.deps(), msg.Chat.ID, itemCode, warehouse)
+		if err := commands.HandleWarehouseSelected(ctx, a.deps(), msg.Chat.ID, itemCode, warehouse); err != nil {
+			return err
+		}
+		a.deleteTrackedWarehousePromptMessage(ctx, msg.Chat.ID)
+		a.deleteMessageBestEffort(ctx, msg.Chat.ID, msg.MessageID, "delete selected-warehouse warning")
+		return nil
 	}
 
 	if itemCode, ok := commands.ExtractSelectedItemCode(text); ok {
-		if err := commands.HandleItemSelected(ctx, a.deps(), msg.Chat.ID, itemCode); err != nil {
+		messageID, err := commands.HandleItemSelected(ctx, a.deps(), msg.Chat.ID, itemCode)
+		if err != nil {
 			return err
 		}
+		a.trackWarehousePromptMessage(ctx, msg.Chat.ID, messageID)
 		a.deleteTrackedBatchPromptMessage(ctx, msg.Chat.ID)
 		a.deleteMessageBestEffort(ctx, msg.Chat.ID, msg.MessageID, "delete selected-item warning")
 		return nil
@@ -127,6 +136,7 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		}
 		a.trackBatchPromptMessage(ctx, msg.Chat.ID, messageID)
 		a.deleteTrackedStartInfoMessage(ctx, msg.Chat.ID)
+		a.deleteTrackedWarehousePromptMessage(ctx, msg.Chat.ID)
 		return nil
 	default:
 		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch")
@@ -171,6 +181,26 @@ func (a *App) deleteTrackedBatchPromptMessage(ctx context.Context, chatID int64)
 	}
 	a.deleteMessageBestEffort(ctx, chatID, messageID, "delete batch-prompt warning")
 	delete(a.batchPromptMsgByChat, chatID)
+}
+
+func (a *App) trackWarehousePromptMessage(ctx context.Context, chatID, messageID int64) {
+	if messageID <= 0 {
+		return
+	}
+
+	if prev := a.warehousePromptMsgByChat[chatID]; prev > 0 && prev != messageID {
+		a.deleteMessageBestEffort(ctx, chatID, prev, "delete old warehouse-prompt warning")
+	}
+	a.warehousePromptMsgByChat[chatID] = messageID
+}
+
+func (a *App) deleteTrackedWarehousePromptMessage(ctx context.Context, chatID int64) {
+	messageID := a.warehousePromptMsgByChat[chatID]
+	if messageID <= 0 {
+		return
+	}
+	a.deleteMessageBestEffort(ctx, chatID, messageID, "delete warehouse-prompt warning")
+	delete(a.warehousePromptMsgByChat, chatID)
 }
 
 func (a *App) maybeDeleteCommandMessage(ctx context.Context, msg telegram.Message, cmd string) {

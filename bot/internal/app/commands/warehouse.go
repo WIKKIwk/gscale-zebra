@@ -41,10 +41,10 @@ func ExtractSelectedItemCode(text string) (string, bool) {
 	return code, true
 }
 
-func HandleItemSelected(ctx context.Context, deps Deps, chatID int64, itemCode string) error {
+func HandleItemSelected(ctx context.Context, deps Deps, chatID int64, itemCode string) (int64, error) {
 	itemCode = strings.TrimSpace(itemCode)
 	if itemCode == "" {
-		return nil
+		return 0, nil
 	}
 
 	keyboard := &telegram.InlineKeyboardMarkup{
@@ -56,16 +56,16 @@ func HandleItemSelected(ctx context.Context, deps Deps, chatID int64, itemCode s
 	}
 
 	text := fmt.Sprintf("Item tanlandi: %s\nEndi pastdagi tugmani bosib omborni tanlang.", itemCode)
-	err := deps.TG.SendMessageWithInlineKeyboard(ctx, chatID, text, keyboard)
+	messageID, err := deps.TG.SendMessageWithInlineKeyboardAndReturnID(ctx, chatID, text, keyboard)
 	if err == nil {
-		return nil
+		return messageID, nil
 	}
 
 	if isInlineButtonUnsupported(err) {
-		return deps.TG.SendMessage(ctx, chatID, "Inline mode o'chirilgan. BotFather'da /setinline ni yoqing, keyin /batch ni qayta bering.")
+		return 0, deps.TG.SendMessage(ctx, chatID, "Inline mode o'chirilgan. BotFather'da /setinline ni yoqing, keyin /batch ni qayta bering.")
 	}
 
-	return err
+	return 0, err
 }
 
 func HandleWarehouseInlineQuery(ctx context.Context, deps Deps, q telegram.InlineQuery, request warehouseQueryRequest) error {
