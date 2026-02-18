@@ -9,7 +9,7 @@ import (
 )
 
 func (a *App) Run(ctx context.Context) error {
-	a.log.Printf("bot started, ERP=%s", a.cfg.ERPURL)
+	a.log.Printf("bot started, ERP=%s scale=%s", a.cfg.ERPURL, a.cfg.ScaleAPIURL)
 	var offset int64
 
 	for {
@@ -44,7 +44,7 @@ func (a *App) handleUpdate(ctx context.Context, upd telegram.Update) {
 	}
 
 	if upd.CallbackQuery != nil {
-		if err := commands.HandleCallbackQuery(ctx, a.deps(), *upd.CallbackQuery); err != nil {
+		if err := a.handleCallbackQuery(ctx, *upd.CallbackQuery); err != nil {
 			a.log.Printf("handleCallbackQuery error: %v", err)
 		}
 		return

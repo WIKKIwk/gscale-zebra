@@ -18,6 +18,7 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		if err := commands.HandleWarehouseSelected(ctx, a.deps(), msg.Chat.ID, itemCode, warehouse); err != nil {
 			return err
 		}
+		a.rememberSelection(msg.Chat.ID, itemCode, warehouse)
 		a.deleteTrackedWarehousePromptMessage(ctx, msg.Chat.ID)
 		a.deleteMessageBestEffort(ctx, msg.Chat.ID, msg.MessageID, "delete selected-warehouse warning")
 		return nil
@@ -57,6 +58,7 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		a.trackBatchPromptMessage(ctx, msg.Chat.ID, messageID)
 		a.deleteTrackedStartInfoMessage(ctx, msg.Chat.ID)
 		a.deleteTrackedWarehousePromptMessage(ctx, msg.Chat.ID)
+		a.clearSelection(msg.Chat.ID)
 		return nil
 	default:
 		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch")

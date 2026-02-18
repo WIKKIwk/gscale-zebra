@@ -8,8 +8,8 @@ import (
 	"bot/internal/telegram"
 )
 
-const stockEntryCallbackMaterialIssue = "stock:material_issue"
-const stockEntryCallbackReceipt = "stock:receipt"
+const StockEntryCallbackMaterialIssue = "stock:material_issue"
+const StockEntryCallbackReceipt = "stock:receipt"
 
 func ExtractSelectedWarehouse(text string) (string, string, bool) {
 	lines := strings.Split(strings.TrimSpace(text), "\n")
@@ -48,23 +48,12 @@ func HandleWarehouseSelected(ctx context.Context, deps Deps, chatID int64, itemC
 	keyboard := &telegram.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telegram.InlineKeyboardButton{
 			{
-				{Text: "Material Issue", CallbackData: stockEntryCallbackMaterialIssue},
-				{Text: "Receipt", CallbackData: stockEntryCallbackReceipt},
+				{Text: "Material Issue", CallbackData: StockEntryCallbackMaterialIssue},
+				{Text: "Receipt", CallbackData: StockEntryCallbackReceipt},
 			},
 		},
 	}
 
 	text := fmt.Sprintf("Item tanlandi: %s\nOmbor tanlandi: %s\nStock entry tanlang:", itemCode, warehouse)
 	return deps.TG.SendMessageWithInlineKeyboard(ctx, chatID, text, keyboard)
-}
-
-func HandleCallbackQuery(ctx context.Context, deps Deps, q telegram.CallbackQuery) error {
-	switch strings.TrimSpace(q.Data) {
-	case stockEntryCallbackMaterialIssue:
-		return deps.TG.AnswerCallbackQuery(ctx, q.ID, "Material Issue tanlandi")
-	case stockEntryCallbackReceipt:
-		return deps.TG.AnswerCallbackQuery(ctx, q.ID, "Receipt tanlandi")
-	default:
-		return deps.TG.AnswerCallbackQuery(ctx, q.ID, "")
-	}
 }

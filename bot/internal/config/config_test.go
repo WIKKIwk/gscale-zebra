@@ -30,4 +30,7 @@ func TestLoadSupportsColonAndAliasKeys(t *testing.T) {
 	if cfg.TelegramBotToken != "123:XYZ" {
 		t.Fatalf("TelegramBotToken mismatch: %q", cfg.TelegramBotToken)
 	}
+	if cfg.ScaleAPIURL != defaultScaleAPIURL {
+		t.Fatalf("ScaleAPIURL mismatch: %q", cfg.ScaleAPIURL)
+	}
 }
