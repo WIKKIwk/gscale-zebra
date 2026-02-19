@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-const minNextQtyDelta = 0.005
+// nextCycleDropFraction: WaitForNextCycle yangi sikl uchun zarur bo'lgan
+// minimal vazn tushishi ulushi (35%). Kichik tebranishlar (78.800↔78.850 = 0.06%)
+// yangi siklni boshlamasligi uchun ishlatiladi.
+const nextCycleDropFraction = 0.35
 
 type Client struct {
 	store *bridgestate.Store
@@ -211,7 +214,9 @@ func (c *Client) WaitForNextCycle(ctx context.Context, timeout, pollInterval tim
 		if s.Weight == nil || *s.Weight <= 0 {
 			return nil
 		}
-		if math.Abs(*s.Weight-lastQty) >= minNextQtyDelta {
+		// Vazn 35%+ kamaysa yangi sikl boshlangan (item olib tashlangan).
+		// Kichik tebranishlar (78.800↔78.850 = 0.06%) yangi siklni boshlamaydi.
+		if lastQty > 0 && *s.Weight < lastQty*(1-nextCycleDropFraction) {
 			return nil
 		}
 

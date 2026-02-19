@@ -1,6 +1,7 @@
 SHELL := /bin/sh
 
-COMPOSE ?= docker compose
+MKFILE_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+COMPOSE ?= docker compose -f $(MKFILE_DIR)docker-compose.yml
 SCALE_DEVICE ?= /dev/ttyUSB0
 ZEBRA_DEVICE ?= /dev/usb/lp0
 
@@ -32,13 +33,20 @@ run: check-env
 	@set -e; \
 	cleanup() { $(COMPOSE) stop bot >/dev/null 2>&1 || true; }; \
 	trap cleanup EXIT INT TERM; \
+	docker ps -aq --filter ancestor=gscale-zebra:local | xargs -r docker rm -f 2>/dev/null || true; \
 	$(COMPOSE) down --remove-orphans >/dev/null 2>&1 || true; \
 	$(DC_ENV) $(COMPOSE) build --no-cache; \
 	$(DC_ENV) $(COMPOSE) up -d --no-deps --force-recreate bot; \
 	$(DC_ENV) $(COMPOSE) run --rm --no-deps --service-ports scale
 
 run-bg: check-env
-	$(DC_ENV) $(COMPOSE) up -d --build
+	@echo "==> Barcha eski gscale-zebra containerlarni o'chirish..."
+	@docker ps -aq --filter ancestor=gscale-zebra:local | xargs -r docker rm -f 2>/dev/null || true
+	@$(COMPOSE) down --remove-orphans 2>/dev/null || true
+	@echo "==> Build..."
+	$(DC_ENV) $(COMPOSE) build --no-cache
+	@echo "==> Run..."
+	$(DC_ENV) $(COMPOSE) up -d --force-recreate
 
 down:
 	$(COMPOSE) down --remove-orphans

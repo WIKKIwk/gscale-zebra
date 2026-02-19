@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+  <head lang="en">
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <title>Welcome to the Link-OS Multiplatform SDK for Web Services</title>
+    <style type="text/css">
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial;
+        margin: 0;
+        padding: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+	table, td, th {
+		border: 0 solid black;
+	}
+
+	table {
+		border-collapse: collapse;
+		width: 738px;
+		/* margin:24px 0 0 188px; */
+		/* padding: 24px 0 0 188px; */
+	}
+
+	td {
+		/*height: 50px;*/
+		vertical-align: middle;
+	}
+
+	  #learn-more-button:link, #learn-more-button:visited {
+		background-color: #000000;
+		color: white;
+		padding: 12px 24px;
+		font-family: Arial;
+		text-align: center;
+		text-decoration: none;
+		/* display: inline-block; */
+		float: right;		
+		border-radius: 6px;
+	  }
+
+	  #learn-more-button:hover, #learn-more-button:active {
+		background-color: #A8F931;
+		color: black;
+		float: right;
+	  }
+      
+	  .clearfix:after {
+        content: "";
+        display: table;
+        clear: both;
+      }
+
+      /* Main header */
+      #landingPageHeaderContainer {
+        background-color: black;
+        color: white;
+      }
+
+      #landingPageHeader {
+        transition: all 0.2s linear;
+        display: block;
+        max-width: 768px;
+        position: relative;
+        margin: 0 auto;
+        height: 195px;
+      }
+  
+	  .zebraLogo2025 {
+        transition: all 0.2s linear;
+        display: block;
+        height: 120px;
+        width: 120px;
+        position: absolute;
+        top: 38px;
+        left: 0;
+      }
+      
+	  #landingPageHeaderTextContainer {
+        transition: all 0.2s linear;
+        padding-left: 175px;
+        padding-right: 60px;
+        position: relative;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+	  #mainContentCSOContainer {
+		transition: all 0.2s linear;
+        padding: 22.5px 0;
+		/*position: relative;
+        top: 50%;
+        transform: translateY(-50%);*/
+		background-color: #F2F2F2;
+		height: 90px;
+	  }
+		
+	  #CSOTable {
+		transition: all 0.2s linear;
+		display: block;
+        max-width: 738px;
+        position: relative;
+        margin: 0 auto;
+      }
+
+      .section-cso-heading {
+        color: #000000;
+        letter-spacing: normal;
+        font-family: Arial, sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        font-style: normal;
+		margin: 0 0 5px 0;
+      }
+
+      .header-text {
+        display: block;
+      }
+	  
+      #headerWelcomeText {
+        transition: all 0.2s linear;
+        color: #FFFFFF;
+        font-family: 'Arial Narrow', sans-serif;
+		font-size: 16px;
+        font-weight: 800;
+        font-style: normal;
+        letter-spacing: normal;
+        text-transform: uppercase;
+      }
+
+      #headerLinkOsText {
+        transition: all 0.2s linear;
+        font-family: Arial, sans-serif;
+		font-size: 36px;
+        font-style: normal;
+        font-weight: 800;
+        letter-spacing: normal;
+      }
+
+      #headerPlatformText {
+        transition: all 0.2s linear;
+        font-family: Arial, sans-serif;
+		font-size: 16px;
+        font-weight: 400;
+        font-style: normal;
+        letter-spacing: normal;
+      }
+
+      /* Section links */
+      #mainContentContainer {
+        background-color: white;
+      }
+
+      #sectionLinkMainContainer {
+        max-width: 768px;
+        margin: 0 auto;
+      }
+
+      .section-link-grid-container {
+        float: left;
+        padding: 15px;
+        width: 50%;
+        height: 270px;
+      }
+
+      .section-link-container {
+        transition: all 0.2s linear;
+        text-align: center;
+	    border: 2px solid transparent;   /* no visible border by default*/
+ 	    border-radius: 6px;              /* optional: rounded corners */        
+		background-color: transparent;
+        padding: 30px;
+        height: 100%;
+      }
+
+      .section-link-container:hover {
+        /* background-color: #E6E6E6; */
+		border-color: #1F69FF;
+        cursor: pointer;
+      }
+
+      .section-link-icon-container {
+        transition: all 0.2s linear;
+        margin: 0 auto;
+        background: #E2F1FF;
+        height: 100px;
+        width: 100px;
+        text-align: center;
+        border-radius: 50px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+
+      .section-link-icon-container:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .section-link-icon {
+        max-height: 50px;
+        max-width: 50px;
+        position: relative;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      .section-link-heading {
+        color: #000000;
+        /* text-transform: uppercase; */
+        letter-spacing: normal;
+        font-family: Arial, sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        font-style: normal;
+        margin-top: 15px;
+        margin-bottom: 5px;
+      }
+
+      .section-link-text {
+        margin: 0;
+        font-family: Arial, sans-serif;
+		font-weight: 400;
+        font-size: 14px;
+        font-style: normal;
+      }
+
+      /* Main footer */
+      #landingPageFooter {
+        display: block;
+        background: white;
+        color: #aaa;
+        text-align: center;
+        padding-top: 15px;
+        padding-bottom: 30px;
+      }
+
+      #landingPageFooterText {
+        font-size: 0.7em;
+      }
+
+      /* Media queries */
+      @media (max-width: 500px) {
+        #landingPageHeader {
+          height: 160px;
+        }
+
+        #zebraLogo {
+          top: 20px;
+          left: 30px;
+        }
+
+        #landingPageHeaderTextContainer {
+          padding-left: 145px;
+        }
+
+        #headerWelcomeText {
+          font-size: 1.5em;
+        }
+
+        #headerLinkOsText {
+          font-size: 1.1em;
+        }
+
+        .section-link-grid-container {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="landingPageHeaderContainer">
+      <header id="landingPageHeader">
+		<div class="zebraLogo2025">
+			<?xml version="1.0" encoding="UTF-8"?>
+			<svg id="zebralogo" data-name="Vertical Logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376.42 376.59">
+				<defs>
+					<style>
+						.cls-1 {
+						fill: #fff;
+						}
+					</style>
+				</defs>
+			  <polygon class="cls-1" points="224.78 76.4 224.76 76.4 224.78 76.42 224.78 76.4"/>
+			  <polygon class="cls-1" points="82.27 134.42 199.75 251.53 199.75 226.57 82.27 109.44 82.27 134.42"/>
+			  <path class="cls-1" d="M261.62,113.08v-.02l-18.36-18.33h-25.11s-18.4-18.33-18.4-18.33h25.02l-18.19-18.31-25.21.04-49.02-48.74c-3.87,1.62-12.71,7.36-15.27,9.61l45.92,45.78v100s36.75,36.64,36.75,36.64v-25s-18.38-18.33-18.38-18.33v-81.69h18.4l-.02,83.97h18.4v-65.64l18.34,18.35v47.3h18.38s0-29.01,0-29.01l-18.38-18.29h25.13Z"/>
+			  <path class="cls-1" d="M210.55,29.07c0-16.06-13.04-29.07-29.15-29.07v58.13c16.11,0,29.15-13.01,29.15-29.07Z"/>
+			  <path class="cls-1" d="M144.63,146.53l-.02-75.11-40.4-40.28c-3.78,4.27-7.73,10.06-10.36,14.67l32.4,32.32v25.11l-39.99-39.87c-2.19,7.57-3.46,13.81-3.84,21.16l62.19,62h.02Z"/>
+			  <path class="cls-1" d="M198.29,331.91c13.13-3.2,15.95-14.56,15.95-20.9,0-8.65-3.88-16.32-10.27-20.1-5-3.11-11.79-4.32-23.59-4.32h.01s-31.63,0-31.63,0v89.99h37.88c9.43,0,14.98-1.25,19.56-4.22,5.97-3.91,9.43-11.32,9.43-19.68,0-6.61-2.07-11.87-6.25-15.65-2.91-2.7-5.42-3.92-11.1-5.13ZM171.25,302.91h5.26c10.53,0,14.84,2.97,14.84,10.39s-4.3,10.51-14.56,10.51h-5.54v-20.9ZM179.42,360.91h-8.19s.01-21.18.01-21.18h5.12c6.8,0,9.03.26,11.52,1.61,3.33,1.76,5,4.85,5,9.17,0,7.28-4.03,10.39-13.46,10.39Z"/>
+			  <path class="cls-1" d="M347.24,286.6h-27.54l-28.32,86.8-19.9-33.67h-.01c13.58-4.22,19.51-14.26,19.51-25.73,0-24.43-22.12-27.4-34.32-27.4h-32.12v89.99h22.49v-37.32l20.26,37.32h45.86l5.47-17.71h28.81l5.47,17.71h23.52l-29.18-89.99ZM253.86,325.61h-6.86v-22.69h6.61c9.53,0,15.38,2.26,15.38,10.93,0,10.5-5.85,11.76-15.13,11.76ZM324.08,341.05l8.94-28.69,8.93,28.69h-17.87Z"/>
+			  <polygon class="cls-1" points="81.45 376.59 137.76 376.59 137.76 358.92 103.15 358.92 103.15 340.34 132.49 340.34 132.49 322.68 103.15 322.68 103.15 304.28 137.76 304.28 137.76 286.6 81.45 286.6 81.45 376.59"/>
+			  <path class="cls-1" d="M273.25,140.19l-.08,20.18h-18.29c0,16.06,13.04,29.07,29.15,29.07s29.15-13.01,29.15-29.07v-.04l-20.22-20.15h-19.71Z"/>
+			  <polygon class="cls-1" points="14.01 286.6 4.45 304.27 38.74 304.27 0 376.59 59.59 376.59 69.14 358.92 34.85 358.92 73.58 286.6 14.01 286.6"/>
+			</svg>
+		</div>
+        <div id="landingPageHeaderTextContainer">
+          <span id="headerWelcomeText" class="header-text">WELCOME</span>
+          <span id="headerLinkOsText" class="header-text">Link-OS Multiplatform SDK</span>
+          <span id="headerPlatformText" class="header-text">Java for Desktop PC</span>
+        </div>
+      </header>
+    </div>
+    <div id="mainContentContainer">
+      <div id="sectionLinkMainContainer" class="clearfix">
+        <div class="section-link-grid-container">
+          <div id="releaseNotes" class="section-link-container">
+            <div class="section-link-icon-container">
+				<svg class="section-link-icon" width="50" height="50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<path d="M19 3H14.82C14.4 1.84 13.3 1 12 1C10.7 1 9.6 1.84 9.18 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM12 3C12.55 3 13 3.45 13 4C13 4.55 12.55 5 12 5C11.45 5 11 4.55 11 4C11 3.45 11.45 3 12 3ZM13 17H8C7.45 17 7 16.55 7 16C7 15.45 7.45 15 8 15H13C13.55 15 14 15.45 14 16C14 16.55 13.55 17 13 17ZM16 13H8C7.45 13 7 12.55 7 12C7 11.45 7.45 11 8 11H16C16.55 11 17 11.45 17 12C17 12.55 16.55 13 16 13ZM16 9H8C7.45 9 7 8.55 7 8C7 7.45 7.45 7 8 7H16C16.55 7 17 7.45 17 8C17 8.55 16.55 9 16 9Z" fill="#1F69FF"/>
+				</svg>
+            </div>
+            <h4 class="section-link-heading">Release Notes</h4>
+            <p class="section-link-text">Supported devices, requirements, known issues, and change log.</p>
+          </div>
+        </div>
+        <div class="section-link-grid-container">
+          <div id="documentation" class="section-link-container">
+            <div class="section-link-icon-container">
+				<svg class="section-link-icon" width="50" height="50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<path d="M14.59 2.59C14.21 2.21 13.7 2 13.17 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8.83C20 8.3 19.79 7.79 19.41 7.42L14.59 2.59ZM15 18H9C8.45 18 8 17.55 8 17C8 16.45 8.45 16 9 16H15C15.55 16 16 16.45 16 17C16 17.55 15.55 18 15 18ZM15 14H9C8.45 14 8 13.55 8 13C8 12.45 8.45 12 9 12H15C15.55 12 16 12.45 16 13C16 13.55 15.55 14 15 14ZM13 8V3.5L18.5 9H14C13.45 9 13 8.55 13 8Z" fill="#1F69FF"/>
+				</svg>
+            </div>
+            <h4 class="section-link-heading">Documentation</h4>
+            <p class="section-link-text">Packages and classes available in the API, Certificate requirements.
+            </p>
+          </div>
+        </div>
+        <div class="section-link-grid-container">
+          <div id="exampleCode" class="section-link-container">
+            <div class="section-link-icon-container">
+				<svg class="section-link-icon" width="50" height="50" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<g id="software-icon-black">
+				<g id="Group 48644">
+				<path id="Rectangle 9976 (Stroke)" fill-rule="evenodd" clip-rule="evenodd" d="M28 8H4L6 6H26L28 8Z" fill="#1F69FF"/>
+				<path id="Rectangle 9976 (Stroke)_2" fill-rule="evenodd" clip-rule="evenodd" d="M4 24L28 24L26 26L6 26L4 24Z" fill="#1F69FF"/>
+				<path id="Rectangle 9976 (Stroke)_3" fill-rule="evenodd" clip-rule="evenodd" d="M4 8L4 24L2 22L2 10.1429L4 8Z" fill="#1F69FF"/>
+				<path id="Rectangle 9976 (Stroke)_4" fill-rule="evenodd" clip-rule="evenodd" d="M28 7.99999L28 24L30 22L30 9.99999L28 7.99999Z" fill="#1F69FF"/>
+				<g id="Group 48637">
+				<path id="Vector 284 (Stroke)" d="M11.3496 12.7071L7.91406 16.1426L11.3496 19.5782L9.93555 20.9932L5.08594 16.1426L9.93555 11.293L11.3496 12.7071Z" fill="#1F69FF"/>
+				<path id="Vector 285 (Stroke)" d="M20.6504 19.5787L24.0859 16.1431L20.6504 12.7076L22.0645 11.2925L26.9141 16.1431L22.0645 20.9927L20.6504 19.5787Z" fill="#1F69FF"/>
+				<path id="Vector 310 (Stroke)" d="M19.8245 13.4928L13.2571 20.0602L11.843 18.6461L18.4104 12.0787L19.8245 13.4928Z" fill="#1F69FF"/>
+				</g>
+				</g>
+				</g>
+				</svg>
+            </div>
+            <h4 class="section-link-heading">Example Code</h4>
+            <p class="section-link-text">Working example source code developed using the SDK.</p>
+          </div>
+        </div>
+        <div class="section-link-grid-container">
+          <div id="eula" class="section-link-container">
+            <div class="section-link-icon-container">
+				<svg class="section-link-icon" width="40" height="40" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<path d="M14.1593 0H1.9469C0.876106 0 0 0.9 0 2V18C0 19.1 0.866372 20 1.93717 20H18.0531C19.1239 20 20 19.1 20 18V6L14.1593 0ZM18.0531 18H1.9469V2H13.1858V7H18.0531V18Z" fill="#1F69FF"/>
+				<path d="M2.76927 16V9.718H5.19927C5.50527 9.718 5.77827 9.766 6.01827 9.862C6.25827 9.952 6.45927 10.084 6.62127 10.258C6.78927 10.432 6.91527 10.642 6.99927 10.888C7.08327 11.134 7.12527 11.41 7.12527 11.716C7.12527 12.022 7.08327 12.298 6.99927 12.544C6.91527 12.79 6.78927 13 6.62127 13.174C6.45927 13.348 6.25827 13.483 6.01827 13.579C5.77827 13.669 5.50527 13.714 5.19927 13.714H4.12827V16H2.76927ZM4.12827 12.625H4.85727C5.17527 12.625 5.39427 12.565 5.51427 12.445C5.64027 12.325 5.70327 12.127 5.70327 11.851V11.581C5.70327 11.305 5.64027 11.107 5.51427 10.987C5.39427 10.867 5.17527 10.807 4.85727 10.807H4.12827V12.625Z" fill="#1F69FF"/>
+				<path d="M7.87776 9.718H9.90276C10.7488 9.718 11.3758 9.988 11.7838 10.528C12.1918 11.068 12.3958 11.845 12.3958 12.859C12.3958 13.873 12.1918 14.65 11.7838 15.19C11.3758 15.73 10.7488 16 9.90276 16H7.87776V9.718ZM9.81276 14.938C10.2148 14.938 10.5088 14.809 10.6948 14.551C10.8808 14.293 10.9738 13.918 10.9738 13.426V12.283C10.9738 11.797 10.8808 11.425 10.6948 11.167C10.5088 10.909 10.2148 10.78 9.81276 10.78H9.20976V14.938H9.81276Z" fill="#1F69FF"/>
+				<path d="M13.2382 16V9.718H17.4052V10.825H14.5882V12.265H17.1082V13.372H14.5882V16H13.2382Z" fill="#1F69FF"/>
+				</svg>
+          </div>
+            <h4 class="section-link-heading">EULA</h4>
+            <p class="section-link-text">End-User License Agreement for using this SDK.</p>
+          </div>
+        </div>
+    </div>
+     
+  </div>    
+
+	<div id="mainContentCSOContainer">
+		<div id=CSOTable>
+			<table>
+				<tr>
+					<td>
+						<p class="section-cso-heading">Zebra Open Source</p>
+						<p class="section-link-text">View the legal notices applicable to Zebra products.</p>
+					</td>
+					<td>
+						<a id="learn-more-button" href="https://www.zebra.com/us/en/about-zebra/company-information/legal/open-source-usage.html" target="_blank">Learn More&nbsp; &nbsp;<i class="fa fa-chevron-right" aria-hidden="true"></i></a>
+					</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+	
+	<footer id="landingPageFooter">
+      <span id="landingPageFooterText"> ZEBRA and the stylized Zebra head are trademarks of Zebra Technologies Corporation, registered in many jurisdictions worldwide. All other trademarks are the property of their respective owners. &copy;2025 Zebra Technologies Corporation and/or its affiliates. All rights reserved. </br>
+        <a href="http://www.zebra.com">www.zebra.com</a>
+      </span>
+    </footer>
+    <script>
+      // Click handlers
+      document.getElementById('releaseNotes').onclick = function() {
+        //window.location.href = 'documentation/readme.html';
+		window.open('documentation/readme.html', '_blank');
+      }
+      document.getElementById('documentation').onclick = function() {
+        //window.location.href = 'documentation/index.html';
+		window.open('documentation/index.html', '_blank');
+      }
+      document.getElementById('exampleCode').onclick = function() {
+        //window.location.href = 'demos';
+		window.open('demos', '_blank');
+      }
+      document.getElementById('eula').onclick = function() {
+        //window.location.href = 'documentation/Zebra_Development_Tool_License_Agreement.pdf';
+		window.open('documentation/Zebra_Development_Tool_License_Agreement.pdf', '_blank');
+      }
+    </script>
+  </body>
+</html>

@@ -33,12 +33,20 @@ func main() {
 		if err := runSetVar(args); err != nil {
 			exitErr(err)
 		}
+	case "raw-getvar":
+		if err := runRawGetVar(args); err != nil {
+			exitErr(err)
+		}
 	case "print-test":
 		if err := runPrintTest(args); err != nil {
 			exitErr(err)
 		}
 	case "epc-test", "rfid-test", "encode":
 		if err := runEPCTest(args); err != nil {
+			exitErr(err)
+		}
+	case "read-epc", "rfid-read":
+		if err := runReadEPC(args); err != nil {
 			exitErr(err)
 		}
 	case "calibrate", "auto-calibrate":

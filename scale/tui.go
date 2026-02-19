@@ -181,16 +181,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	case zebraMsg:
-		st := msg.status
-		if strings.TrimSpace(st.LastEPC) == "" && strings.TrimSpace(m.zebra.LastEPC) != "" {
-			st.LastEPC = m.zebra.LastEPC
-			if strings.TrimSpace(st.Verify) == "" || strings.TrimSpace(st.Verify) == "-" {
-				st.Verify = m.zebra.Verify
-			}
-		}
-		if st.UpdatedAt.IsZero() {
-			st.UpdatedAt = time.Now()
-		}
+		st := mergeZebraStatus(m.zebra, msg.status)
 		m.zebra = st
 		if err := writeBridgeStateSnapshot(m.bridgeStore, m.last, m.zebra); err != nil {
 			m.info = "bridge snapshot xato: " + err.Error()
@@ -214,6 +205,25 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 }
+
+func mergeZebraStatus(prev ZebraStatus, incoming ZebraStatus) ZebraStatus {
+	st := incoming
+	if strings.TrimSpace(st.LastEPC) == "" && strings.TrimSpace(prev.LastEPC) != "" {
+		st.LastEPC = prev.LastEPC
+		if strings.TrimSpace(st.Verify) == "" || strings.TrimSpace(st.Verify) == "-" {
+			st.Verify = prev.Verify
+		}
+		// Monitor heartbeat eski EPC ni qayta vaqtlab yubormasin.
+		if !prev.UpdatedAt.IsZero() {
+			st.UpdatedAt = prev.UpdatedAt
+		}
+	}
+	if st.UpdatedAt.IsZero() {
+		st.UpdatedAt = time.Now()
+	}
+	return st
+}
+
 func (m tuiModel) View() string {
 	w, _ := viewSize(m.width, m.height)
 	now := m.now

@@ -51,6 +51,11 @@ func buildRFIDEncodeCommand(epc, qtyText, itemName string) (string, error) {
 	}
 
 	// ~PS oldingi pause holatini yechadi; keyingi ZPL job aniq ketadi.
+	// ^RS8,,,1,N — TagType=8 (Gen2 EPC Class 1 Gen2), LabelsToTry=1, ErrorHandling=N.
+	//   N = RFID xato bo'lsa ham label chiqaradi (abort qilmaydi).
+	// ^RFW,H,,,A — EPC bankiga hex formatda yozish; A = Auto PC bits.
+	//   PC word (EPC bank birinchi 2 bayti) avtomatik to'g'ri yoziladi.
+	//   PC word yo'q bo'lsa skaner EPC uzunligini noto'g'ri aniqlaydi (masalan 22 o'rniga 24).
 	return "~PS\n" +
 		"^XA\n" +
 		"^LH0,0\n" +
@@ -82,6 +87,9 @@ func normalizeEPC(epc string) (string, error) {
 	}
 	if len(v)%2 != 0 {
 		return "", errors.New("epc uzunligi juft bo'lishi kerak")
+	}
+	if len(v)%4 != 0 {
+		return "", errors.New("epc uzunligi 16-bit word (4 hex belgi) ga bo'linishi kerak")
 	}
 	if len(v) < 8 || len(v) > 64 {
 		return "", errors.New("epc uzunligi 8..64 oralig'ida bo'lsin")

@@ -12,6 +12,7 @@ type rfidProfileOptions struct {
 	ErrorHandling string
 	ReadPower     int
 	WritePower    int
+	TagType       string
 }
 
 func defaultRFIDProfileOptions() rfidProfileOptions {
@@ -20,6 +21,7 @@ func defaultRFIDProfileOptions() rfidProfileOptions {
 		ErrorHandling: "none",
 		ReadPower:     30,
 		WritePower:    30,
+		TagType:       "gen2",
 	}
 }
 
@@ -66,13 +68,19 @@ func applyRFIDProfile(device string, timeout time.Duration, opt rfidProfileOptio
 		notes = append(notes, "read_content=warn")
 	}
 
-	if setRFIDVar(device, []string{"rfid.reader_power.read", "rfid.read_power"}, strconv.Itoa(opt.ReadPower), timeout) {
+	if setRFIDVar(device, []string{"rfid.tag.type"}, normalizeRFIDTagType(opt.TagType), timeout) {
+		notes = append(notes, "tag=gen2")
+	} else {
+		notes = append(notes, "tag=warn")
+	}
+
+	if setRFIDVar(device, []string{"rfid.reader_1.power.read", "rfid.reader_power.read", "rfid.read_power"}, strconv.Itoa(opt.ReadPower), timeout) {
 		notes = append(notes, fmt.Sprintf("read_pwr=%d", opt.ReadPower))
 	} else {
 		notes = append(notes, "read_pwr=warn")
 	}
 
-	if setRFIDVar(device, []string{"rfid.reader_power.write", "rfid.write_power"}, strconv.Itoa(opt.WritePower), timeout) {
+	if setRFIDVar(device, []string{"rfid.reader_1.power.write", "rfid.reader_power.write", "rfid.write_power"}, strconv.Itoa(opt.WritePower), timeout) {
 		notes = append(notes, fmt.Sprintf("write_pwr=%d", opt.WritePower))
 	} else {
 		notes = append(notes, "write_pwr=warn")
@@ -89,6 +97,7 @@ func setRFIDVar(device string, keys []string, value string, timeout time.Duratio
 
 	// Known keylarni tekshirib birinchisini tanlaymiz; query bo'lmasa default birinchisi.
 	key := strings.TrimSpace(keys[0])
+	found := false
 	for _, k := range keys {
 		k = strings.TrimSpace(k)
 		if k == "" {
@@ -96,8 +105,14 @@ func setRFIDVar(device string, keys []string, value string, timeout time.Duratio
 		}
 		if got := queryVarRetry(device, k, timeout, 1, 0); got != "" {
 			key = k
+			found = true
 			break
 		}
+	}
+
+	// Ba'zi printerlarda getvar bo'sh qaytishi mumkin; baribir birinchi kalitni sinab ko'ramiz.
+	if !found {
+		key = strings.TrimSpace(keys[0])
 	}
 
 	cmd := fmt.Sprintf("! U1 setvar \"%s\" \"%s\"\r\n", key, strings.ReplaceAll(value, "\"", ""))
@@ -105,8 +120,44 @@ func setRFIDVar(device string, keys []string, value string, timeout time.Duratio
 		return false
 	}
 
-	// Read-back har modelda ham bo'lmasligi mumkin; set yuborilganini success deb olamiz.
-	return true
+	// Read-back mavjud bo'lsa tekshirib chiqamiz.
+	got := strings.TrimSpace(queryVarRetry(device, key, timeout, 2, 60*time.Millisecond))
+	if got == "" || got == "?" {
+		return true
+	}
+	if strings.EqualFold(got, value) {
+		return true
+	}
+	// "none/pause/error", "on/off", "gen2" kabi qiymatlarda case farqi bo'lishi mumkin.
+	return strings.EqualFold(strings.Trim(got, "\""), strings.Trim(value, "\""))
+}
+
+func normalizeRFIDTagType(v string) string {
+	s := strings.ToLower(strings.TrimSpace(v))
+	if s == "" {
+		return "gen2"
+	}
+	switch s {
+	case "gen2":
+		return "gen2"
+	default:
+		return "gen2"
+	}
+}
+
+func runRFIDTagCalibrate(device string) bool {
+	commands := []string{
+		`! U1 setvar "rfid.reader_1.tag.calibrate" "run"` + "\r\n",
+		`! U1 do "rfid.calibrate"` + "\r\n",
+		`! U1 setvar "rfid.tag.calibrate" "run"` + "\r\n",
+	}
+	for _, cmd := range commands {
+		if err := sendRawRetry(device, []byte(cmd), 3, 120*time.Millisecond); err == nil {
+			time.Sleep(450 * time.Millisecond)
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeRFIDErrorHandling(v string) string {

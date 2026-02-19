@@ -149,6 +149,15 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", "", "", "Scale xato: "+err.Error()))
 			continue
 		}
+		a.log.Printf(
+			"batch stable qty: chat=%d item=%s warehouse=%s qty=%.3f unit=%s scale_at=%s",
+			chatID,
+			strings.TrimSpace(sel.ItemCode),
+			strings.TrimSpace(sel.Warehouse),
+			reading.Qty,
+			strings.TrimSpace(reading.Unit),
+			reading.UpdatedAt.Format(time.RFC3339Nano),
+		)
 
 		epc := ""
 		epcVerify := "UNKNOWN"
@@ -165,8 +174,22 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			if epcVerify == "" {
 				epcVerify = "UNKNOWN"
 			}
+			a.log.Printf(
+				"batch epc matched: chat=%d qty=%.3f epc=%s verify=%s zebra_at=%s",
+				chatID,
+				reading.Qty,
+				epc,
+				epcVerify,
+				epcReading.UpdatedAt.Format(time.RFC3339Nano),
+			)
 		}
 		if strings.TrimSpace(epc) == "" {
+			a.log.Printf(
+				"batch epc missing: chat=%d qty=%.3f reason=%s",
+				chatID,
+				reading.Qty,
+				strings.TrimSpace(epcNote),
+			)
 			note := "RFID yozilmadi (EPC olinmadi)"
 			if strings.TrimSpace(epcNote) != "" {
 				note = note + " | " + strings.TrimSpace(epcNote)
@@ -187,9 +210,11 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			Barcode:   epc,
 		})
 		if err != nil {
+			a.log.Printf("batch draft create error: chat=%d qty=%.3f epc=%s err=%v", chatID, reading.Qty, epc, err)
 			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", epc, epcVerify, "ERP xato: "+err.Error()))
 			continue
 		}
+		a.log.Printf("batch draft created: chat=%d draft=%s qty=%.3f epc=%s", chatID, strings.TrimSpace(draft.Name), draft.Qty, epc)
 
 		draftCount++
 		if epc != "" {

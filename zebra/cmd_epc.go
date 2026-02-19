@@ -14,8 +14,9 @@ func runEPCTest(args []string) error {
 	epc := fs.String("epc", "3034257BF7194E4000000001", "EPC hex")
 	feed := fs.Bool("feed", true, "feed label after encode")
 	printHuman := fs.Bool("print-human", true, "print EPC text on label")
-	autoTune := fs.Bool("auto-tune", true, "auto calibrate and retry on NO TAG")
+	autoTune := fs.Bool("auto-tune", false, "auto calibrate and retry on NO TAG")
 	profileInit := fs.Bool("profile-init", true, "set RFID profile before encode")
+	profileCal := fs.Bool("profile-calibrate", true, "run rfid.tag.calibrate before encode")
 	labelTries := fs.Int("label-tries", 1, "rfid.label_tries (1..10)")
 	errorHandling := fs.String("error-handling", "none", "rfid.error_handling: none|pause|error")
 	readPower := fs.Int("read-power", 30, "RFID read power (0..30)")
@@ -56,11 +57,20 @@ func runEPCTest(args []string) error {
 		opt.WritePower = *writePower
 		profile := applyRFIDProfile(p.DevicePath, *timeout, opt)
 		fmt.Printf("Profile: %s\n", profile)
+		if *profileCal {
+			if runRFIDTagCalibrate(p.DevicePath) {
+				fmt.Println("Profile: tag-calibrate=ok")
+			} else {
+				fmt.Println("Profile: tag-calibrate=warn")
+			}
+		}
 	}
+	waitReady(p.DevicePath, 5*time.Second)
 
 	beforeCount := queryVarRetry(p.DevicePath, "odometer.total_label_count", *timeout, 4, 120*time.Millisecond)
 	beforeMedia := queryVarRetry(p.DevicePath, "media.status", *timeout, 4, 120*time.Millisecond)
 	beforeDevice := queryVarRetry(p.DevicePath, "device.status", *timeout, 4, 120*time.Millisecond)
+	beforeRFID := queryVarRetry(p.DevicePath, "rfid.error.response", *timeout, 2, 90*time.Millisecond)
 
 	attempts := 1
 	auto := "no"
@@ -88,10 +98,11 @@ func runEPCTest(args []string) error {
 	afterCount := queryVarRetry(p.DevicePath, "odometer.total_label_count", *timeout, 5, 150*time.Millisecond)
 	afterMedia := queryVarRetry(p.DevicePath, "media.status", *timeout, 5, 150*time.Millisecond)
 	afterDevice := queryVarRetry(p.DevicePath, "device.status", *timeout, 5, 150*time.Millisecond)
+	afterRFID := queryVarRetry(p.DevicePath, "rfid.error.response", *timeout, 5, 120*time.Millisecond)
 	hs, hsErr := queryHostRetry(p.DevicePath, *timeout, 3, 120*time.Millisecond)
 
-	fmt.Printf("Before: label_count=%s media=%s device=%s\n", safeStr(beforeCount, "?"), safeStr(beforeMedia, "?"), safeStr(beforeDevice, "?"))
-	fmt.Printf("After : label_count=%s media=%s device=%s\n", safeStr(afterCount, "?"), safeStr(afterMedia, "?"), safeStr(afterDevice, "?"))
+	fmt.Printf("Before: label_count=%s media=%s device=%s rfid=%s\n", safeStr(beforeCount, "?"), safeStr(beforeMedia, "?"), safeStr(beforeDevice, "?"), safeStr(beforeRFID, "?"))
+	fmt.Printf("After : label_count=%s media=%s device=%s rfid=%s\n", safeStr(afterCount, "?"), safeStr(afterMedia, "?"), safeStr(afterDevice, "?"), safeStr(afterRFID, "?"))
 	fmt.Printf("Read  : line1=%s line2=%s verify=%s attempts=%d auto_tune=%s\n", safeStr(read1, "-"), safeStr(read2, "-"), verify, attempts, auto)
 	if note != "-" {
 		fmt.Printf("Tune  : %s\n", note)
@@ -113,9 +124,17 @@ func runEPCAttempt(device, stream, expected string, timeout time.Duration) (stri
 	if err := sendRawRetry(device, []byte(stream), 5, 120*time.Millisecond); err != nil {
 		return "", "", "UNKNOWN", err
 	}
-	time.Sleep(820 * time.Millisecond)
+	time.Sleep(320 * time.Millisecond)
 
-	read1, read2, verify := readbackRFIDResult(device, expected, timeout, 4)
+	respSamples := sampleRFIDErrorResponses(device, timeout)
+	verify := inferVerifyFromRFIDSamples(respSamples)
+
+	// Eslatma: post-read alohida SGD so'rov bo'lgani uchun ko'pincha keyingi label/no-tag holatiga tushadi.
+	// Shu sabab verify manbasi sifatida rfid.error.response ishlatiladi.
+	read1, read2 := "-", "-"
+	if verify == "UNKNOWN" {
+		verify = inferVerify("", "", expected)
+	}
 	return read1, read2, verify, nil
 }
 
@@ -154,8 +173,8 @@ func shouldAutoTune(verify string) bool {
 func runAutoTuneSequence(device string) string {
 	notes := make([]string, 0, 4)
 
-	if err := sendSGDRetry(device, `! U1 do "rfid.calibrate"`, 3, 120*time.Millisecond); err == nil {
-		notes = append(notes, "rfid.calibrate")
+	if runRFIDTagCalibrate(device) {
+		notes = append(notes, "rfid.tag.calibrate")
 		waitReady(device, 2*time.Second)
 	}
 	if err := sendRawRetry(device, []byte("^XA^HR^XZ\n"), 3, 140*time.Millisecond); err == nil {
@@ -309,4 +328,56 @@ func isBusyLikeError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "resource busy") || strings.Contains(msg, "device or resource busy") || strings.Contains(msg, "temporarily unavailable")
+}
+
+func inferVerifyFromRFIDResponse(resp string) string {
+	u := strings.ToUpper(strings.TrimSpace(resp))
+	switch {
+	case strings.Contains(u, "RFID OK"):
+		return "WRITTEN"
+	case strings.Contains(u, "NO TAG"):
+		return "NO TAG"
+	case strings.Contains(u, "ERROR"):
+		return "ERROR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+func inferVerifyFromRFIDSamples(samples []string) string {
+	if len(samples) == 0 {
+		return "UNKNOWN"
+	}
+	hasNoTag := false
+	hasError := false
+	for _, s := range samples {
+		v := inferVerifyFromRFIDResponse(s)
+		switch v {
+		case "WRITTEN":
+			return "WRITTEN"
+		case "NO TAG":
+			hasNoTag = true
+		case "ERROR":
+			hasError = true
+		}
+	}
+	if hasError {
+		return "ERROR"
+	}
+	if hasNoTag {
+		return "NO TAG"
+	}
+	return "UNKNOWN"
+}
+
+func sampleRFIDErrorResponses(device string, timeout time.Duration) []string {
+	out := make([]string, 0, 8)
+	for i := 0; i < 8; i++ {
+		v := strings.TrimSpace(queryVarRetry(device, "rfid.error.response", timeout, 1, 0))
+		if v != "" {
+			out = append(out, v)
+		}
+		time.Sleep(90 * time.Millisecond)
+	}
+	return out
 }

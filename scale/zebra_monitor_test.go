@@ -7,7 +7,7 @@ import (
 )
 
 func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
-	stream, err := buildRFIDEncodeCommand("3034ABCDEF1234567890AA", "1.250 kg", "GREEN TEA")
+	stream, err := buildRFIDEncodeCommand("3034ABCDEF1234567890AABB", "1.250 kg", "GREEN TEA")
 	if err != nil {
 		t.Fatalf("buildRFIDEncodeCommand error: %v", err)
 	}
@@ -15,13 +15,16 @@ func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
 		t.Fatalf("stream must start with resume+format: %q", stream)
 	}
 
-	if !strings.Contains(stream, "^RFW,H,,,A^FD3034ABCDEF1234567890AA^FS") {
+	if !strings.Contains(stream, "^RFW,H,,,A^FD3034ABCDEF1234567890AABB^FS") {
 		t.Fatalf("rfid write command not found in stream: %s", stream)
+	}
+	if !strings.Contains(stream, "^RS8,,,1,N") {
+		t.Fatalf("^RS tag type + error-handling flag missing in stream: %s", stream)
 	}
 	if !strings.Contains(stream, "^FDMAHSULOT: GREEN TEA^FS") {
 		t.Fatalf("human MAHSULOT line missing: %s", stream)
 	}
-	if !strings.Contains(stream, "^FDEPC: 3034ABCDEF1234567890AA^FS") {
+	if !strings.Contains(stream, "^FDEPC: 3034ABCDEF1234567890AABB^FS") {
 		t.Fatalf("human EPC line missing: %s", stream)
 	}
 	if !strings.Contains(stream, "^FDQTY: 1.250 kg^FS") {
@@ -30,13 +33,13 @@ func TestBuildRFIDEncodeCommand_IncludesEPCAndQtyOnLabel(t *testing.T) {
 	if !strings.Contains(stream, "^BCN,44,N,N,N") {
 		t.Fatalf("barcode command missing: %s", stream)
 	}
-	if strings.Count(stream, "3034ABCDEF1234567890AA") < 3 {
+	if strings.Count(stream, "3034ABCDEF1234567890AABB") < 3 {
 		t.Fatalf("epc should be present for rfid write, text and barcode: %s", stream)
 	}
 }
 
 func TestBuildRFIDEncodeCommand_DefaultQtyWhenEmpty(t *testing.T) {
-	stream, err := buildRFIDEncodeCommand("3034ABCDEF1234567890AA", "", "")
+	stream, err := buildRFIDEncodeCommand("3034ABCDEF1234567890AABB", "", "")
 	if err != nil {
 		t.Fatalf("buildRFIDEncodeCommand error: %v", err)
 	}
@@ -46,6 +49,24 @@ func TestBuildRFIDEncodeCommand_DefaultQtyWhenEmpty(t *testing.T) {
 	}
 	if !strings.Contains(stream, "^FDMAHSULOT: -^FS") {
 		t.Fatalf("default item missing: %s", stream)
+	}
+}
+
+func TestNormalizeEPC_RejectsNonWordAligned(t *testing.T) {
+	// 22 belgi: 22%4=2 — rad etilishi kerak
+	_, err := normalizeEPC("3034ABCDEF1234567890AA")
+	if err == nil {
+		t.Fatal("22-char EPC should be rejected (not 16-bit word aligned)")
+	}
+}
+
+func TestNormalizeEPC_Accepts24Char(t *testing.T) {
+	v, err := normalizeEPC("3034abcdef1234567890aabb")
+	if err != nil {
+		t.Fatalf("24-char EPC should be accepted: %v", err)
+	}
+	if v != "3034ABCDEF1234567890AABB" {
+		t.Fatalf("expected uppercase, got %q", v)
 	}
 }
 

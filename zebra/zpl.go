@@ -54,12 +54,15 @@ func BuildRFIDEncodeCommandStream(epc string, copies int, feedAfter bool, printH
 	}
 
 	var b strings.Builder
+	// C# reference oqimi: pause holatini yechib, keyin RFID format yuboriladi.
+	b.WriteString("~PS\n")
 	b.WriteString("^XA\n")
 	b.WriteString("^LH0,0\n")
-	if feedAfter {
+	if feedAfter && !printHuman {
 		b.WriteString("^MMT\n")
 	}
 	b.WriteString("^RS8,,,1,N\n")
+	// C# reference: MB=1/WP=2 bo'lsa auto-PC bit bilan yozish.
 	b.WriteString(fmt.Sprintf("^RFW,H,,,A^FD%s^FS\n", norm))
 	if printHuman {
 		b.WriteString("^FO20,24^A0N,22,22^FB520,3,0,L,0\n")
@@ -67,7 +70,7 @@ func BuildRFIDEncodeCommandStream(epc string, copies int, feedAfter bool, printH
 	}
 	b.WriteString(fmt.Sprintf("^PQ%d\n", copies))
 	b.WriteString("^XZ\n")
-	if feedAfter {
+	if feedAfter && !printHuman {
 		b.WriteString("~PH\n")
 	}
 	return b.String(), nil

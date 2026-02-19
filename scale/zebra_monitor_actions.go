@@ -51,7 +51,7 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 		st.Error = err.Error()
 		return st
 	}
-	st.LastEPC = norm
+	attemptedEPC := norm
 
 	p, err := SelectZebraPrinter(preferredDevice)
 	if err != nil {
@@ -73,11 +73,14 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	st.Verify = verify
 	st.Attempts = attempts
 	st.AutoTuned = autoTuned
+	// ZPL muvaffaqiyatli yuborildi (encodeAndVerify xatosiz qaytdi), shuning uchun
+	// LastEPC doim o'rnatiladi. Verify — faqat ma'lumot maqsadida ko'rsatiladi.
+	st.LastEPC = attemptedEPC
 
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
-	if st.Verify != "MATCH" && strings.TrimSpace(st.Error) == "" {
-		st.Note = strings.TrimSpace(strings.Join([]string{st.Note, "verify=" + st.Verify}, " "))
+	if !isVerifySuccess(st.Verify) && strings.TrimSpace(st.Error) == "" {
+		st.Note = strings.TrimSpace(strings.Join([]string{st.Note, "verify=" + st.Verify, "epc_attempt=" + attemptedEPC}, " "))
 	}
 	return st
 }
@@ -86,18 +89,42 @@ func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duratio
 	const attempts = 1
 	const autoTuned = false
 
+	// MIB (Link-OS 7.5): printer power-off yoki reset bo'lganda bu qiymatlar
+	// default ga qaytishi mumkin. Har encode oldidan SGD orqali majburan o'rnatamiz.
+	//   rfid.enable         = on   → o'chirilgan bo'lsa printer RFID yozmaydi
+	//   rfid.error_handling = none → pause/error rejimida printer bloklanadi
+	//   rfid.label_tries    = 2   → 2 urinish beradi (birinchi muvaffaqiyatsiz bo'lsa)
+	_ = sendSGDRetry(device, `! U1 setvar "rfid.enable" "on"`, 2, 60*time.Millisecond)
+	_ = sendSGDRetry(device, `! U1 setvar "rfid.error_handling" "none"`, 2, 60*time.Millisecond)
+	_ = sendSGDRetry(device, `! U1 setvar "rfid.label_tries" "2"`, 2, 60*time.Millisecond)
+
 	stream, err := buildRFIDEncodeCommand(epc, qtyText, itemName)
 	if err != nil {
 		return "", "", "UNKNOWN", attempts, autoTuned, err
 	}
+
 	if err := sendRawRetry(device, []byte(stream), 8, 120*time.Millisecond); err != nil {
 		if isBusyLikeError(err) {
 			return "", "", "UNKNOWN", attempts, autoTuned, fmt.Errorf("%w (printer busy: boshqa process /dev/usb/lp0 ni band qilgan)", err)
 		}
 		return "", "", "UNKNOWN", attempts, autoTuned, err
 	}
-	time.Sleep(820 * time.Millisecond)
-	line1, line2, verify := readbackRFIDResult(device, epc, timeout, 1)
+
+	// Fixed time.Sleep emas: printer RFID yozishni tugatib "ready" ga qaytguncha
+	// faol kutamiz (max 1.5s). Bu label o'lchamiga qarab variable bo'ladi.
+	waitReady(device, 1500*time.Millisecond)
+
+	respSamples := sampleRFIDErrorResponses(device, timeout)
+	verify := inferVerifyFromRFIDSamples(respSamples)
+
+	line1, line2 := "-", "-"
+	if len(respSamples) > 0 {
+		line1 = respSamples[len(respSamples)-1]
+	}
+
+	if verify == "UNKNOWN" {
+		line1, line2, verify = readbackRFIDResult(device, epc, timeout, 1)
+	}
 	return line1, line2, verify, attempts, autoTuned, nil
 }
 
@@ -130,6 +157,67 @@ func readbackRFIDResult(device, expected string, timeout time.Duration, retries 
 func shouldAutoTune(verify string) bool {
 	v := strings.ToUpper(strings.TrimSpace(verify))
 	return v == "NO TAG" || v == "UNKNOWN" || v == "ERROR"
+}
+
+func isVerifySuccess(verify string) bool {
+	switch strings.ToUpper(strings.TrimSpace(verify)) {
+	case "MATCH", "OK", "WRITTEN":
+		return true
+	default:
+		return false
+	}
+}
+
+func inferVerifyFromRFIDResponse(resp string) string {
+	u := strings.ToUpper(strings.TrimSpace(resp))
+	switch {
+	case strings.Contains(u, "RFID OK"):
+		return "WRITTEN"
+	case strings.Contains(u, "NO TAG"):
+		return "NO TAG"
+	case strings.Contains(u, "ERROR"):
+		return "ERROR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+func inferVerifyFromRFIDSamples(samples []string) string {
+	if len(samples) == 0 {
+		return "UNKNOWN"
+	}
+	hasNoTag := false
+	hasError := false
+	for _, s := range samples {
+		v := inferVerifyFromRFIDResponse(s)
+		switch v {
+		case "WRITTEN":
+			return "WRITTEN"
+		case "NO TAG":
+			hasNoTag = true
+		case "ERROR":
+			hasError = true
+		}
+	}
+	if hasError {
+		return "ERROR"
+	}
+	if hasNoTag {
+		return "NO TAG"
+	}
+	return "UNKNOWN"
+}
+
+func sampleRFIDErrorResponses(device string, timeout time.Duration) []string {
+	out := make([]string, 0, 8)
+	for i := 0; i < 8; i++ {
+		v := strings.TrimSpace(queryVarRetry(device, "rfid.error.response", timeout, 1, 0))
+		if v != "" {
+			out = append(out, v)
+		}
+		time.Sleep(90 * time.Millisecond)
+	}
+	return out
 }
 
 func runAutoTuneSequence(device string) string {
