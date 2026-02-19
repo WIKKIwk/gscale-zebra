@@ -12,6 +12,12 @@ import (
 	"bot/internal/telegram"
 )
 
+const (
+	epcWaitTimeout      = 6 * time.Second
+	epcWaitGraceTimeout = 1 * time.Second
+	epcWaitPollInterval = 140 * time.Millisecond
+)
+
 func (a *App) handleCallbackQuery(ctx context.Context, q telegram.CallbackQuery) error {
 	data := strings.TrimSpace(q.Data)
 	switch data {
@@ -162,12 +168,46 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 		epc := ""
 		epcVerify := "UNKNOWN"
 		epcNote := ""
-		epcReading, err := a.qtyReader.WaitEPCForReading(ctx, 6*time.Second, 140*time.Millisecond, reading.UpdatedAt, lastEPC)
+		epcReading, err := a.qtyReader.WaitEPCForReading(ctx, epcWaitTimeout, epcWaitPollInterval, reading.UpdatedAt, lastEPC)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
-			epcNote = err.Error()
+			if isTimeoutLikeError(err) {
+				// Zebra tez javob beradi, lekin event propagation va polling race tufayli
+				// ba'zida EPC snapshot 6s oynadan ozgina keyin kelishi mumkin.
+				// Katta timeout bermaymiz, faqat qisqa grace-check qilamiz.
+				a.logBatch.Printf(
+					"batch epc wait timeout: chat=%d qty=%.3f timeout=%s, grace=%s",
+					chatID,
+					reading.Qty,
+					epcWaitTimeout,
+					epcWaitGraceTimeout,
+				)
+				graceReading, graceErr := a.qtyReader.WaitEPCForReading(ctx, epcWaitGraceTimeout, epcWaitPollInterval, reading.UpdatedAt, lastEPC)
+				if graceErr == nil {
+					epc = strings.ToUpper(strings.TrimSpace(graceReading.EPC))
+					epcVerify = strings.ToUpper(strings.TrimSpace(graceReading.Verify))
+					if epcVerify == "" {
+						epcVerify = "UNKNOWN"
+					}
+					a.logBatch.Printf(
+						"batch epc matched (grace): chat=%d qty=%.3f epc=%s verify=%s zebra_at=%s",
+						chatID,
+						reading.Qty,
+						epc,
+						epcVerify,
+						graceReading.UpdatedAt.Format(time.RFC3339Nano),
+					)
+				} else {
+					if errors.Is(graceErr, context.Canceled) || errors.Is(graceErr, context.DeadlineExceeded) {
+						return
+					}
+					epcNote = strings.TrimSpace(err.Error() + " | grace: " + graceErr.Error())
+				}
+			} else {
+				epcNote = err.Error()
+			}
 		} else {
 			epc = strings.ToUpper(strings.TrimSpace(epcReading.EPC))
 			epcVerify = strings.ToUpper(strings.TrimSpace(epcReading.Verify))
@@ -323,6 +363,17 @@ func isRFIDVerifySuccess(verify string) bool {
 	default:
 		return false
 	}
+}
+
+func isTimeoutLikeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(msg, "timeout")
 }
 
 func formatSelectedItem(sel SelectedContext) string {
