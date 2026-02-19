@@ -64,7 +64,7 @@ func buildRFIDEncodeCommand(epc, qtyText, itemName string) (string, error) {
 		"^FO8,52^A0N,38,32^FB760,1,0,L,0\n" +
 		fmt.Sprintf("^FDMAHSULOT: %s^FS\n", item) +
 		"^FO8,118^A0N,44,38\n" +
-		fmt.Sprintf("^FDQTY: %s^FS\n", qty) +
+		fmt.Sprintf("^FDVAZNI: %s^FS\n", qty) +
 		"^FO8,184^A0N,24,20^FB760,1,0,L,0\n" +
 		fmt.Sprintf("^FDEPC: %s^FS\n", sanitizeZPLText(norm)) +
 		"^FO8,236^BY3,2,44^BCN,44,N,N,N\n" +
