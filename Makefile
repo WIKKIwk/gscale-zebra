@@ -3,8 +3,10 @@ SHELL := /bin/sh
 SCALE_DEVICE ?= /dev/ttyUSB0
 ZEBRA_DEVICE ?= /dev/usb/lp0
 BRIDGE_STATE_FILE ?= /tmp/gscale-zebra/bridge_state.json
+APP_USER ?= $(shell id -un)
+APP_GROUP ?= $(shell id -gn)
 
-.PHONY: help check-env build build-bot build-scale build-zebra run run-scale run-bot test clean release release-all
+.PHONY: help check-env build build-bot build-scale build-zebra run run-scale run-bot test clean release release-all autostart-install autostart-status autostart-restart autostart-stop
 
 help:
 	@echo "Targets:"
@@ -13,6 +15,10 @@ help:
 	@echo "  make run-bot    - faqat telegram bot"
 	@echo "  make build      - bot + scale + zebra binary build (./bin)"
 	@echo "  make test       - barcha modullarda test"
+	@echo "  make autostart-install - systemd service'larni o'rnatadi va start qiladi"
+	@echo "  make autostart-status  - service holatini ko'rsatadi"
+	@echo "  make autostart-restart - service'larni restart qiladi"
+	@echo "  make autostart-stop    - service'larni to'xtatadi"
 	@echo "  make release    - linux/amd64 tar release"
 	@echo "  make release-all - linux/amd64 + linux/arm64 tar release"
 	@echo "  make clean      - local build papkalarini tozalash"
@@ -53,7 +59,20 @@ test:
 	cd core && GOWORK=off go test ./...
 
 clean:
-	rm -rf ./bin ./dist
+	@if [ -d ./bin ]; then find ./bin -type f -delete; find ./bin -type d -empty -delete; fi
+	@if [ -d ./dist ]; then find ./dist -type f -delete; find ./dist -type d -empty -delete; fi
+
+autostart-install: check-env build
+	sudo ./deploy/install.sh --user "$(APP_USER)" --group "$(APP_GROUP)" --start
+
+autostart-status:
+	sudo systemctl --no-pager --full status gscale-scale.service gscale-bot.service
+
+autostart-restart:
+	sudo systemctl restart gscale-scale.service gscale-bot.service
+
+autostart-stop:
+	sudo systemctl stop gscale-scale.service gscale-bot.service
 
 release:
 	./scripts/release.sh --arch amd64

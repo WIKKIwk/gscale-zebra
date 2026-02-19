@@ -11,6 +11,9 @@ usage() {
 Usage: ./install.sh [options]
 
 Install gscale-zebra binaries and systemd services.
+Works from either:
+- release tar root (install.sh, bin/, config/, systemd/)
+- repository deploy dir (expects ../bin from `make build`)
 
 Options:
   --prefix <path>  Install root (default: /opt/gscale-zebra)
@@ -58,13 +61,40 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+BIN_DIR=""
+CONFIG_DIR=""
+UNIT_DIR=""
+
+if [[ -f "${SCRIPT_DIR}/bin/bot" && -f "${SCRIPT_DIR}/config/bot.env.example" && -f "${SCRIPT_DIR}/systemd/gscale-scale.service" ]]; then
+  # Release tar layout:
+  #   <root>/install.sh
+  #   <root>/bin/*
+  #   <root>/config/*
+  #   <root>/systemd/*
+  BIN_DIR="${SCRIPT_DIR}/bin"
+  CONFIG_DIR="${SCRIPT_DIR}/config"
+  UNIT_DIR="${SCRIPT_DIR}/systemd"
+elif [[ -f "${SCRIPT_DIR}/../bin/bot" && -f "${SCRIPT_DIR}/config/bot.env.example" && -f "${SCRIPT_DIR}/systemd/gscale-scale.service" ]]; then
+  # Repo layout:
+  #   <repo>/deploy/install.sh
+  #   <repo>/bin/*
+  #   <repo>/deploy/config/*
+  #   <repo>/deploy/systemd/*
+  BIN_DIR="${SCRIPT_DIR}/../bin"
+  CONFIG_DIR="${SCRIPT_DIR}/config"
+  UNIT_DIR="${SCRIPT_DIR}/systemd"
+else
+  echo "Unable to detect install layout. Build binaries first (make build) or use release tar." >&2
+  exit 1
+fi
+
 required=(
-  "${SCRIPT_DIR}/bin/bot"
-  "${SCRIPT_DIR}/bin/scale"
-  "${SCRIPT_DIR}/config/bot.env.example"
-  "${SCRIPT_DIR}/config/scale.env.example"
-  "${SCRIPT_DIR}/systemd/gscale-bot.service"
-  "${SCRIPT_DIR}/systemd/gscale-scale.service"
+  "${BIN_DIR}/bot"
+  "${BIN_DIR}/scale"
+  "${CONFIG_DIR}/bot.env.example"
+  "${CONFIG_DIR}/scale.env.example"
+  "${UNIT_DIR}/gscale-bot.service"
+  "${UNIT_DIR}/gscale-scale.service"
 )
 
 for f in "${required[@]}"; do
@@ -95,17 +125,17 @@ fi
 echo "==> Installing to ${PREFIX}"
 install -d -m 0755 "${PREFIX}" "${PREFIX}/bin" "${PREFIX}/config" "${PREFIX}/logs"
 
-install -m 0755 "${SCRIPT_DIR}/bin/bot" "${PREFIX}/bin/bot"
-install -m 0755 "${SCRIPT_DIR}/bin/scale" "${PREFIX}/bin/scale"
-if [[ -f "${SCRIPT_DIR}/bin/zebra" ]]; then
-  install -m 0755 "${SCRIPT_DIR}/bin/zebra" "${PREFIX}/bin/zebra"
+install -m 0755 "${BIN_DIR}/bot" "${PREFIX}/bin/bot"
+install -m 0755 "${BIN_DIR}/scale" "${PREFIX}/bin/scale"
+if [[ -f "${BIN_DIR}/zebra" ]]; then
+  install -m 0755 "${BIN_DIR}/zebra" "${PREFIX}/bin/zebra"
 fi
 
 if [[ ! -f "${PREFIX}/config/bot.env" ]]; then
-  install -m 0640 "${SCRIPT_DIR}/config/bot.env.example" "${PREFIX}/config/bot.env"
+  install -m 0640 "${CONFIG_DIR}/bot.env.example" "${PREFIX}/config/bot.env"
 fi
 if [[ ! -f "${PREFIX}/config/scale.env" ]]; then
-  install -m 0640 "${SCRIPT_DIR}/config/scale.env.example" "${PREFIX}/config/scale.env"
+  install -m 0640 "${CONFIG_DIR}/scale.env.example" "${PREFIX}/config/scale.env"
 fi
 
 chown -R "${APP_USER}:${APP_GROUP}" "${PREFIX}/logs"
@@ -132,8 +162,8 @@ tmp_scale="$(mktemp)"
 tmp_bot="$(mktemp)"
 trap 'rm -f "${tmp_scale}" "${tmp_bot}"' EXIT
 
-render_unit "${SCRIPT_DIR}/systemd/gscale-scale.service" "${tmp_scale}"
-render_unit "${SCRIPT_DIR}/systemd/gscale-bot.service" "${tmp_bot}"
+render_unit "${UNIT_DIR}/gscale-scale.service" "${tmp_scale}"
+render_unit "${UNIT_DIR}/gscale-bot.service" "${tmp_bot}"
 
 install -m 0644 "${tmp_scale}" /etc/systemd/system/gscale-scale.service
 install -m 0644 "${tmp_bot}" /etc/systemd/system/gscale-bot.service

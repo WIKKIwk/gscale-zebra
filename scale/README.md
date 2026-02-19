@@ -15,6 +15,17 @@ TUI tugmalari:
 - `e` - qo'lda encode+print yuborish
 - `r` - RFID read yuborish
 
+## Boot'da auto-start (systemd) 🚀
+
+Repo root'dan:
+
+```bash
+cd /home/wikki/local.git/gscale-zebra
+make autostart-install
+```
+
+Bu `scale` va `bot` service'larini systemd'ga o'rnatadi, enable qiladi va start beradi.
+
 ## Ishlash oqimi
 
 1. Serial port auto-detect qilinadi (`/dev/serial/by-id/*`, `ttyUSB*`, `ttyACM*`).

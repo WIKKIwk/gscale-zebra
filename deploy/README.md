@@ -16,7 +16,7 @@ This package is built for Linux and is tested for Ubuntu/Arch style hosts.
 ```bash
 tar -xzf gscale-zebra-<version>-linux-<arch>.tar.gz
 cd gscale-zebra-<version>-linux-<arch>
-sudo ./install.sh
+sudo ./install.sh --start
 ```
 
 Then set real credentials:
@@ -24,9 +24,20 @@ Then set real credentials:
 - `config/bot.env` (token + ERP creds)
 - `config/scale.env` (device paths)
 
-Start services:
+Service management:
 
 ```bash
 sudo systemctl restart gscale-scale.service gscale-bot.service
 sudo systemctl status gscale-scale.service gscale-bot.service
 ```
+
+## Repo mode (without release tar)
+
+If you run directly from repository, you can do:
+
+```bash
+cd /home/wikki/local.git/gscale-zebra
+make autostart-install
+```
+
+This builds binaries, installs systemd units, and enables boot auto-start.
