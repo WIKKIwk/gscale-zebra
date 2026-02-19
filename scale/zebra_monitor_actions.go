@@ -82,11 +82,9 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	st.Verify = verify
 	st.Attempts = attempts
 	st.AutoTuned = autoTuned
-	// Strict gate: EPC faqat yozish tasdiqlanganda (MATCH/OK/WRITTEN) chiqariladi.
-	// Shunda yuqori qatlamlar (bot/ERP) muvaffaqiyatsiz encode holatida draft yubormaydi.
-	if isVerifySuccess(st.Verify) {
-		st.LastEPC = attemptedEPC
-	}
+	// Operator talabi bo'yicha encode urinish EPC'si har doim bridge'ga beriladi.
+	// Verify alohida signal sifatida qoladi (MATCH/WRITTEN/MISMATCH/NO TAG).
+	st.LastEPC = attemptedEPC
 
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
@@ -101,14 +99,12 @@ func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duratio
 	const attempts = 1
 	const autoTuned = false
 
-	// MIB (Link-OS 7.5): printer power-off yoki reset bo'lganda bu qiymatlar
-	// default ga qaytishi mumkin. Har encode oldidan SGD orqali majburan o'rnatamiz.
-	//   rfid.enable         = on   → o'chirilgan bo'lsa printer RFID yozmaydi
-	//   rfid.error_handling = none → pause/error rejimida printer bloklanadi
-	//   rfid.label_tries    = 2   → 2 urinish beradi (birinchi muvaffaqiyatsiz bo'lsa)
-	_ = sendSGDRetry(device, `! U1 setvar "rfid.enable" "on"`, 2, 60*time.Millisecond)
-	_ = sendSGDRetry(device, `! U1 setvar "rfid.error_handling" "none"`, 2, 60*time.Millisecond)
-	_ = sendSGDRetry(device, `! U1 setvar "rfid.label_tries" "2"`, 2, 60*time.Millisecond)
+	// Har encode oldidan "ultra" profilni majburan qo'llaymiz:
+	// - rfid.enable=on
+	// - rfid.error_handling=none
+	// - rfid.label_tries=3
+	// - read/write power = 30 (max)
+	applyRFIDUltraSettings(device)
 
 	stream, err := buildRFIDEncodeCommand(epc, qtyText, itemName)
 	if err != nil {
@@ -123,8 +119,8 @@ func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duratio
 	}
 
 	// Fixed time.Sleep emas: printer RFID yozishni tugatib "ready" ga qaytguncha
-	// faol kutamiz (max 1.5s). Bu label o'lchamiga qarab variable bo'ladi.
-	waitReady(device, 1500*time.Millisecond)
+	// faol kutamiz. Amalda ayrim formatlarda 1.5s kamlik qilgani uchun oynani kengaytiramiz.
+	waitReady(device, 2400*time.Millisecond)
 
 	respSamples := sampleRFIDErrorResponses(device, timeout)
 	verify := inferVerifyFromRFIDSamples(respSamples)
@@ -134,10 +130,43 @@ func encodeAndVerify(device, epc, qtyText, itemName string, timeout time.Duratio
 		line1 = respSamples[len(respSamples)-1]
 	}
 
-	if verify == "UNKNOWN" {
-		line1, line2, verify = readbackRFIDResult(device, epc, timeout, 1)
+	// response "WRITTEN" bo'lmasa readback bilan yana tasdiqlaymiz.
+	// Bu NO TAG/UNKNOWN holatlarini kamaytiradi va haqiqiy EPC matchni ushlaydi.
+	if verify != "WRITTEN" {
+		r1, r2, rv := readbackRFIDResult(device, epc, timeout, 3)
+		if strings.TrimSpace(r1) != "" {
+			line1 = r1
+		}
+		if strings.TrimSpace(r2) != "" {
+			line2 = r2
+		}
+		if strings.TrimSpace(rv) != "" && rv != "UNKNOWN" {
+			verify = rv
+		}
 	}
 	return line1, line2, verify, attempts, autoTuned, nil
+}
+
+func applyRFIDUltraSettings(device string) {
+	_ = sendRawRetry(device, []byte("~PS\n"), 2, 70*time.Millisecond)
+	_ = sendSGDRetry(device, `! U1 setvar "rfid.enable" "on"`, 2, 60*time.Millisecond)
+	_ = sendSGDRetry(device, `! U1 setvar "rfid.error_handling" "none"`, 2, 60*time.Millisecond)
+	_ = sendSGDRetry(device, `! U1 setvar "rfid.label_tries" "3"`, 2, 60*time.Millisecond)
+	_ = sendSGDRetry(device, `! U1 setvar "rfid.tag.read.content" "epc"`, 2, 60*time.Millisecond)
+	_ = sendSGDRetry(device, `! U1 setvar "rfid.tag.type" "gen2"`, 2, 60*time.Millisecond)
+
+	// Firmware versiyasiga qarab key nomlari farq qilishi mumkin,
+	// shu uchun barcha keng tarqalgan aliaslarga yozib chiqamiz.
+	for _, cmd := range []string{
+		`! U1 setvar "rfid.reader_1.power.read" "30"`,
+		`! U1 setvar "rfid.reader_1.power.write" "30"`,
+		`! U1 setvar "rfid.reader_power.read" "30"`,
+		`! U1 setvar "rfid.reader_power.write" "30"`,
+		`! U1 setvar "rfid.read_power" "30"`,
+		`! U1 setvar "rfid.write_power" "30"`,
+	} {
+		_ = sendSGDRetry(device, cmd, 2, 60*time.Millisecond)
+	}
 }
 
 func readbackRFIDResult(device, expected string, timeout time.Duration, retries int) (string, string, string) {
