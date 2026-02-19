@@ -15,7 +15,6 @@ go run ./cmd/bot
 
 - `/start` - ERPNext ulanishini tekshiradi va botni tayyor holatga olib keladi.
 - `/batch` - batch oqimini boshlash uchun item/ombor tanlash jarayonini ochadi.
-- `/image` - rasm yuborilganda Zebra printerga image print qiladi.
 - `/log` - `logs/bot` va `logs/scale` fayllarini Telegram chatga yuboradi.
 
 ## Batch workflow (hozirgi amaliy oqim) ✅
@@ -58,9 +57,6 @@ Majburiy:
 Ixtiyoriy/asosiy:
 
 - `BRIDGE_STATE_FILE` (default: `/tmp/gscale-zebra/bridge_state.json`)
-- `PRINTER_DEVICE` (default: `/dev/usb/lp0`)
-- `LABEL_WIDTH_DOTS` (default: `560`)
-- `LABEL_HEIGHT_DOTS` (default: `320`)
 
 ## Loglar
 

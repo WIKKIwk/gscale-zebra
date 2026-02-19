@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -39,14 +38,6 @@ type sendMessageResponse struct {
 	} `json:"result"`
 }
 
-type getFileResponse struct {
-	OK          bool   `json:"ok"`
-	Description string `json:"description"`
-	Result      struct {
-		FilePath string `json:"file_path"`
-	} `json:"result"`
-}
-
 type Update struct {
 	UpdateID      int64          `json:"update_id"`
 	Message       *Message       `json:"message"`
@@ -55,18 +46,10 @@ type Update struct {
 }
 
 type Message struct {
-	MessageID int64       `json:"message_id"`
-	Text      string      `json:"text"`
-	Photo     []PhotoSize `json:"photo"`
-	Chat      Chat        `json:"chat"`
-	From      User        `json:"from"`
-}
-
-type PhotoSize struct {
-	FileID   string `json:"file_id"`
-	Width    int    `json:"width"`
-	Height   int    `json:"height"`
-	FileSize int64  `json:"file_size"`
+	MessageID int64  `json:"message_id"`
+	Text      string `json:"text"`
+	Chat      Chat   `json:"chat"`
+	From      User   `json:"from"`
 }
 
 type InlineQuery struct {
@@ -231,77 +214,6 @@ func (c *Client) AnswerCallbackQuery(ctx context.Context, callbackQueryID, text 
 		form.Set("text", strings.TrimSpace(text))
 	}
 	return c.callAPI(ctx, "answerCallbackQuery", form)
-}
-
-func (c *Client) GetFilePath(ctx context.Context, fileID string) (string, error) {
-	fileID = strings.TrimSpace(fileID)
-	if fileID == "" {
-		return "", fmt.Errorf("file_id bo'sh")
-	}
-
-	q := url.Values{}
-	q.Set("file_id", fileID)
-	u := fmt.Sprintf("%s/bot%s/getFile?%s", c.baseURL, c.token, q.Encode())
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var payload getFileResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return "", err
-	}
-	if !payload.OK {
-		if strings.TrimSpace(payload.Description) == "" {
-			payload.Description = "getFile OK=false"
-		}
-		return "", fmt.Errorf("telegram: %s", payload.Description)
-	}
-
-	filePath := strings.TrimSpace(payload.Result.FilePath)
-	if filePath == "" {
-		return "", fmt.Errorf("telegram: file_path bo'sh")
-	}
-	return filePath, nil
-}
-
-func (c *Client) DownloadFile(ctx context.Context, filePath string) ([]byte, error) {
-	filePath = strings.TrimLeft(strings.TrimSpace(filePath), "/")
-	if filePath == "" {
-		return nil, fmt.Errorf("file_path bo'sh")
-	}
-
-	u := fmt.Sprintf("%s/file/bot%s/%s", c.baseURL, c.token, filePath)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("telegram: file download status %d", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if len(data) == 0 {
-		return nil, fmt.Errorf("telegram: file bo'sh")
-	}
-	return data, nil
 }
 
 func (c *Client) SendDocument(ctx context.Context, chatID int64, filename string, content []byte, caption string) error {

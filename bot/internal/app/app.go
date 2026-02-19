@@ -10,7 +10,6 @@ import (
 	"bot/internal/bridgeclient"
 	"bot/internal/config"
 	"bot/internal/erp"
-	"bot/internal/labelprint"
 	"bot/internal/telegram"
 )
 
@@ -20,7 +19,6 @@ type App struct {
 	erp                      *erp.Client
 	qtyReader                *bridgeclient.Client
 	batchState               *batchstate.Store
-	imagePrinter             *labelprint.Service
 	log                      *log.Logger
 	logRun                   *log.Logger
 	logBatch                 *log.Logger
@@ -32,7 +30,6 @@ type App struct {
 	selectionByChat          map[int64]SelectedContext
 	itemChoiceByChat         map[int64]itemChoice
 	batchChangeMsgByChat     map[int64]int64
-	imageAwaitByChat         map[int64]bool
 
 	batchMu     sync.Mutex
 	batchNextID int64
@@ -77,7 +74,6 @@ func New(cfg config.Config, logger *log.Logger, runLogger *log.Logger, batchLogg
 		erp:                      erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
 		qtyReader:                bridgeclient.New(cfg.BridgeStateFile),
 		batchState:               batchstate.New(cfg.BridgeStateFile),
-		imagePrinter:             labelprint.New(cfg.PrinterDevice, cfg.LabelWidthDots, cfg.LabelHeightDots),
 		log:                      logger,
 		logRun:                   runLogger,
 		logBatch:                 batchLogger,
@@ -89,7 +85,6 @@ func New(cfg config.Config, logger *log.Logger, runLogger *log.Logger, batchLogg
 		selectionByChat:          make(map[int64]SelectedContext),
 		itemChoiceByChat:         make(map[int64]itemChoice),
 		batchChangeMsgByChat:     make(map[int64]int64),
-		imageAwaitByChat:         make(map[int64]bool),
 		batchByChat:              make(map[int64]batchSession),
 	}
 }

@@ -7,14 +7,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
 const defaultBridgeStateFile = "/tmp/gscale-zebra/bridge_state.json"
-const defaultPrinterDevice = "/dev/usb/lp0"
-const defaultLabelWidthDots = 560
-const defaultLabelHeightDots = 320
 
 type Config struct {
 	TelegramBotToken string
@@ -22,9 +18,6 @@ type Config struct {
 	ERPAPIKey        string
 	ERPAPISecret     string
 	BridgeStateFile  string
-	PrinterDevice    string
-	LabelWidthDots   int
-	LabelHeightDots  int
 }
 
 func Load(envPath string) (Config, error) {
@@ -34,32 +27,6 @@ func Load(envPath string) (Config, error) {
 
 	fileVals, err := parseEnvFile(envPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return Config{}, err
-	}
-
-	labelWidth, err := parsePositiveInt(
-		"LABEL_WIDTH_DOTS",
-		firstNonEmpty(
-			os.Getenv("LABEL_WIDTH_DOTS"),
-			fileVals["LABEL_WIDTH_DOTS"],
-			fileVals["PRINTER_LABEL_WIDTH_DOTS"],
-		),
-		defaultLabelWidthDots,
-	)
-	if err != nil {
-		return Config{}, err
-	}
-
-	labelHeight, err := parsePositiveInt(
-		"LABEL_HEIGHT_DOTS",
-		firstNonEmpty(
-			os.Getenv("LABEL_HEIGHT_DOTS"),
-			fileVals["LABEL_HEIGHT_DOTS"],
-			fileVals["PRINTER_LABEL_HEIGHT_DOTS"],
-		),
-		defaultLabelHeightDots,
-	)
-	if err != nil {
 		return Config{}, err
 	}
 
@@ -90,15 +57,6 @@ func Load(envPath string) (Config, error) {
 			fileVals["BRIDGE_STATE_FILE"],
 			defaultBridgeStateFile,
 		),
-		PrinterDevice: firstNonEmpty(
-			os.Getenv("PRINTER_DEVICE"),
-			fileVals["PRINTER_DEVICE"],
-			os.Getenv("ZEBRA_DEVICE"),
-			fileVals["ZEBRA_DEVICE"],
-			defaultPrinterDevice,
-		),
-		LabelWidthDots:  labelWidth,
-		LabelHeightDots: labelHeight,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -124,15 +82,6 @@ func (c Config) Validate() error {
 	}
 	if strings.TrimSpace(c.BridgeStateFile) == "" {
 		return errors.New("BRIDGE_STATE_FILE bo'sh")
-	}
-	if strings.TrimSpace(c.PrinterDevice) == "" {
-		return errors.New("PRINTER_DEVICE bo'sh")
-	}
-	if c.LabelWidthDots <= 0 {
-		return errors.New("LABEL_WIDTH_DOTS noto'g'ri")
-	}
-	if c.LabelHeightDots <= 0 {
-		return errors.New("LABEL_HEIGHT_DOTS noto'g'ri")
 	}
 
 	u, err := url.Parse(strings.TrimSpace(c.ERPURL))
@@ -201,16 +150,4 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func parsePositiveInt(name, raw string, defaultValue int) (int, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return defaultValue, nil
-	}
-	v, err := strconv.Atoi(raw)
-	if err != nil || v <= 0 {
-		return 0, fmt.Errorf("%s noto'g'ri: %q", name, raw)
-	}
-	return v, nil
 }
