@@ -67,16 +67,19 @@ func (d *StableEPCDetector) Observe(weight *float64, at time.Time) (string, bool
 	}
 
 	// Agar allaqachon chop etilgan bo'lsa:
-	// - Kichik tebranishlar (masalan 78.800↔78.850) yangi EPC hosil qilmaydi.
-	// - Lekin vazn 35%+ kamaysa (item olib tashlangan), yangi siklni boshlaymiz.
-	//   Bu holda foydalanuvchi tarozini 0 ga olib borishga majbur emas.
+	// - O'sha barqaror nuqtada turish qayta trigger bermaydi.
+	// - Yangi sikl uchun vazn printed nuqtadan ma'noli o'zgarishi kerak (epsilon dan katta).
+	//   Keyin yana stable bo'lsa yangi EPC beriladi (hatto oldingi qty ga qaytgan bo'lsa ham).
 	if d.printed {
-		if d.printedWeight > 0 && w < d.printedWeight*0.65 {
-			d.reset()
-			// fall through: yangi sikl boshlanadi
-		} else {
+		if math.Abs(w-d.printedWeight) <= d.cfg.Epsilon {
 			return "", false
 		}
+		d.printed = false
+		d.active = true
+		d.candidate = w
+		d.since = at
+		d.printedWeight = 0
+		return "", false
 	}
 
 	if !d.active {

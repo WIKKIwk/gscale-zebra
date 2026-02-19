@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// nextCycleDropFraction: WaitForNextCycle yangi sikl uchun zarur bo'lgan
-// minimal vazn tushishi ulushi (35%). Kichik tebranishlar (78.800↔78.850 = 0.06%)
-// yangi siklni boshlamasligi uchun ishlatiladi.
-const nextCycleDropFraction = 0.35
+// nextCycleDeltaEpsilon: WaitForNextCycle yangi siklni ochish uchun
+// oxirgi qayd qilingan qty dan minimal ma'noli o'zgarish (kg).
+// Juda kichik jitterlar yangi sikl ochmasligi uchun ishlatiladi.
+const nextCycleDeltaEpsilon = 0.005
 
 type Client struct {
 	store *bridgestate.Store
@@ -176,9 +176,8 @@ func (c *Client) WaitEPCForReading(ctx context.Context, timeout, pollInterval ti
 	}
 }
 
-// WaitForNextCycle returns when scale goes to reset (<=0) OR weight changes enough
-// from last processed qty. This prevents batch from getting stuck when operator
-// replaces product without hitting exact zero.
+// WaitForNextCycle returns when scale goes to reset (<=0) OR weight
+// last processed qty dan ma'noli o'zgaradi (epsilon dan katta).
 func (c *Client) WaitForNextCycle(ctx context.Context, timeout, pollInterval time.Duration, lastQty float64) error {
 	if c == nil || c.store == nil || strings.TrimSpace(c.store.Path()) == "" {
 		return fmt.Errorf("bridge state path bo'sh")
@@ -214,9 +213,8 @@ func (c *Client) WaitForNextCycle(ctx context.Context, timeout, pollInterval tim
 		if s.Weight == nil || *s.Weight <= 0 {
 			return nil
 		}
-		// Vazn 35%+ kamaysa yangi sikl boshlangan (item olib tashlangan).
-		// Kichik tebranishlar (78.800↔78.850 = 0.06%) yangi siklni boshlamaydi.
-		if lastQty > 0 && *s.Weight < lastQty*(1-nextCycleDropFraction) {
+		// Oxirgi qty dan ma'noli og'ish bo'lsa yangi sikl boshlangan deb olamiz.
+		if lastQty > 0 && math.Abs(*s.Weight-lastQty) > nextCycleDeltaEpsilon {
 			return nil
 		}
 

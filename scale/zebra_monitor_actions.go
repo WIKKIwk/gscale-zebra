@@ -73,9 +73,11 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	st.Verify = verify
 	st.Attempts = attempts
 	st.AutoTuned = autoTuned
-	// ZPL muvaffaqiyatli yuborildi (encodeAndVerify xatosiz qaytdi), shuning uchun
-	// LastEPC doim o'rnatiladi. Verify — faqat ma'lumot maqsadida ko'rsatiladi.
-	st.LastEPC = attemptedEPC
+	// Strict gate: EPC faqat yozish tasdiqlanganda (MATCH/OK/WRITTEN) chiqariladi.
+	// Shunda yuqori qatlamlar (bot/ERP) muvaffaqiyatsiz encode holatida draft yubormaydi.
+	if isVerifySuccess(st.Verify) {
+		st.LastEPC = attemptedEPC
+	}
 
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
