@@ -1,10 +1,12 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -300,6 +302,61 @@ func (c *Client) DownloadFile(ctx context.Context, filePath string) ([]byte, err
 		return nil, fmt.Errorf("telegram: file bo'sh")
 	}
 	return data, nil
+}
+
+func (c *Client) SendDocument(ctx context.Context, chatID int64, filename string, content []byte, caption string) error {
+	filename = strings.TrimSpace(filename)
+	if filename == "" {
+		return fmt.Errorf("filename bo'sh")
+	}
+
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+
+	if err := w.WriteField("chat_id", strconv.FormatInt(chatID, 10)); err != nil {
+		return err
+	}
+	if strings.TrimSpace(caption) != "" {
+		if err := w.WriteField("caption", strings.TrimSpace(caption)); err != nil {
+			return err
+		}
+	}
+
+	part, err := w.CreateFormFile("document", filename)
+	if err != nil {
+		return err
+	}
+	if _, err := part.Write(content); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+
+	u := fmt.Sprintf("%s/bot%s/sendDocument", c.baseURL, c.token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, &body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var payload apiOKResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return err
+	}
+	if !payload.OK {
+		if strings.TrimSpace(payload.Description) == "" {
+			payload.Description = "sendDocument OK=false"
+		}
+		return fmt.Errorf("telegram: %s", payload.Description)
+	}
+	return nil
 }
 
 func (c *Client) callSendMessage(ctx context.Context, form url.Values) (int64, error) {

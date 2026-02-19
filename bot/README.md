@@ -16,6 +16,7 @@ go run ./cmd/bot
 - `/start` - ERPNext ulanishini tekshiradi va botni tayyor holatga olib keladi.
 - `/batch` - batch oqimini boshlash uchun item/ombor tanlash jarayonini ochadi.
 - `/image` - rasm yuborilganda Zebra printerga image print qiladi.
+- `/log` - `logs/bot` va `logs/scale` fayllarini Telegram chatga yuboradi.
 
 ## Batch workflow (hozirgi amaliy oqim) ✅
 

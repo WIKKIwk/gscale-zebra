@@ -87,8 +87,11 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		a.setImageAwaiting(msg.Chat.ID, true)
 		_, err := commands.HandleImage(ctx, a.deps(), msg)
 		return err
+	case "/log":
+		a.setImageAwaiting(msg.Chat.ID, false)
+		return a.handleLogCommand(ctx, msg.Chat.ID)
 	default:
-		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch, /image")
+		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch, /image, /log")
 	}
 }
 
@@ -105,7 +108,7 @@ func (a *App) maybeDeleteCommandMessage(ctx context.Context, msg telegram.Messag
 
 func shouldDeleteUserCommand(cmd string) bool {
 	switch cmd {
-	case "/start", "/batch", "/image":
+	case "/start", "/batch", "/image", "/log":
 		return true
 	default:
 		return false
