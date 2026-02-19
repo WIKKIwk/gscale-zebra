@@ -1,47 +1,71 @@
-# bot
+# Bot (Telegram + ERPNext) 🤖
 
-Telegram bot (`/start`, `/batch`, `/image`) orqali ERPNext va Zebra bilan ishlaydi.
+`bot` moduli Telegram orqali batch workflow'ni boshqaradi va ERPNext'ga draft yaratadi.
 
 ## Ishga tushirish
 
 ```bash
 cd /home/wikki/local.git/gscale-zebra/bot
 cp .env.example .env
-# .env ichiga real TELEGRAM_BOT_TOKEN yozing
+# .env ichiga real token va ERP credentials yozing
 go run ./cmd/bot
 ```
 
-## Buyruqlar
+## Qo'llab-quvvatlanadigan buyruqlar
 
-- `/start`
-  - ERPNext API auth tekshiradi.
-  - Ulangan bo'lsa `ERPNext ga ulandi` xabarini yuboradi.
+- `/start` - ERPNext ulanishini tekshiradi va botni tayyor holatga olib keladi.
+- `/batch` - batch oqimini boshlash uchun item/ombor tanlash jarayonini ochadi.
+- `/image` - rasm yuborilganda Zebra printerga image print qiladi.
 
-- `/batch`
-  - `Item tanlang:` xabarini inline tugma bilan yuboradi.
-  - Tugma bosilganda current chat'da Telegram inline menu ochiladi.
-  - Inline query natijalarida ERPNext'dagi itemlar chiqadi.
+## Batch workflow (hozirgi amaliy oqim) ✅
 
-- `/image`
-  - `Rasm tashlang.` xabarini yuboradi.
-  - User rasm yuborsa, bot rasmni label o'lchamiga sig'dirib Zebra printerga chiqaradi.
+1. `/batch` beriladi.
+2. `Item tanlash` inline tugmasi orqali ERP item tanlanadi.
+3. `Ombor tanlash` inline tugmasi orqali warehouse tanlanadi.
+4. Bot `Material Issue` yoki `Receipt` tugmalarini ko'rsatadi.
+5. `Material Issue` bosilganda batch session ishga tushadi.
+6. Scale'dan `stable + musbat qty` keladi.
+7. Zebra'dan EPC olinadi va `VERIFY` tekshiriladi.
+8. Faqat `VERIFY=MATCH|OK|WRITTEN` bo'lsa ERPNext draft yaratiladi.
+
+`Receipt` hozir placeholder holatda (`tez orada qo'shiladi`).
+
+## Batch boshqaruv tugmalari
+
+- `Item almashtirish` - joriy batchni pause qiladi va yangi item tanlashga qaytaradi.
+- `Batch Start` - tanlangan item/ombor bilan batchni qayta boshlaydi.
+- `Batch Stop` - batchni to'xtatadi (`batch.active=false`).
 
 ## Bridge state
 
-Bot batch session holatini shared bridge faylga yozadi:
+Shared snapshot fayl:
 
 - default: `/tmp/gscale-zebra/bridge_state.json`
-- `.env`: `BRIDGE_STATE_FILE=...`
+- config: `BRIDGE_STATE_FILE`
 
-`Material Issue` bosilganda `batch.active=true`, `Batch Stop` bosilganda `batch.active=false` bo'ladi.
-Scale TUI shu holatga qarab auto printni yoqadi/o'chiradi.
+Bot `batch` bo'limini shu faylga yozadi, `scale` esa shu holatga qarab auto-print gate qiladi.
 
-## Printer sozlamalari (`/image`)
+## Konfiguratsiya (`.env`)
 
-- `PRINTER_DEVICE` default: `/dev/usb/lp0`
-- `LABEL_WIDTH_DOTS` default: `560`
-- `LABEL_HEIGHT_DOTS` default: `320`
+Majburiy:
+
+- `TELEGRAM_BOT_TOKEN`
+- `ERP_URL`
+- `ERP_API_KEY`
+- `ERP_API_SECRET`
+
+Ixtiyoriy/asosiy:
+
+- `BRIDGE_STATE_FILE` (default: `/tmp/gscale-zebra/bridge_state.json`)
+- `PRINTER_DEVICE` (default: `/dev/usb/lp0`)
+- `LABEL_WIDTH_DOTS` (default: `560`)
+- `LABEL_HEIGHT_DOTS` (default: `320`)
+
+## Loglar
+
+Ish jarayonida worker loglari `../logs/bot/` ichiga yoziladi.
+Har restartda `logs/bot/` tozalanib, yangi sessiya boshlanadi.
 
 ## Eslatma
 
-Inline menu ishlashi uchun botda inline mode yoqilgan bo'lishi kerak (`@BotFather` -> `/setinline`).
+Inline qidiruv ishlashi uchun `@BotFather -> /setinline` yoqilgan bo'lishi kerak.
