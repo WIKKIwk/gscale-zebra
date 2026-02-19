@@ -19,12 +19,15 @@ type BotProcess struct {
 }
 
 func startBotProcess(botDir string) (*BotProcess, error) {
+	lg := workerLog("worker.bot_runner")
 	dir, err := resolveBotDir(botDir)
 	if err != nil {
+		lg.Printf("resolve bot dir error: %v", err)
 		return nil, err
 	}
 
 	if err := stopExistingBotProcesses(dir); err != nil {
+		lg.Printf("old bot cleanup warning: %v", err)
 		fmt.Fprintf(os.Stderr, "warning: old bot process cleanup xato: %v\n", err)
 	}
 
@@ -35,8 +38,10 @@ func startBotProcess(botDir string) (*BotProcess, error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	if err := cmd.Start(); err != nil {
+		lg.Printf("bot start error: %v", err)
 		return nil, fmt.Errorf("bot start xato: %w", err)
 	}
+	lg.Printf("bot started: pid=%d dir=%s", cmd.Process.Pid, dir)
 
 	bp := &BotProcess{cmd: cmd, done: make(chan error, 1)}
 	go func() {
@@ -46,8 +51,10 @@ func startBotProcess(botDir string) (*BotProcess, error) {
 	select {
 	case err := <-bp.done:
 		if err == nil {
+			lg.Printf("bot exited unexpectedly without error")
 			return nil, errors.New("bot kutilmaganda tez yopildi")
 		}
+		lg.Printf("bot exited early with error: %v", err)
 		return nil, fmt.Errorf("bot start xato: %w", err)
 	case <-time.After(450 * time.Millisecond):
 	}
@@ -56,6 +63,7 @@ func startBotProcess(botDir string) (*BotProcess, error) {
 }
 
 func (bp *BotProcess) Stop(timeout time.Duration) error {
+	lg := workerLog("worker.bot_runner")
 	if bp == nil || bp.cmd == nil || bp.cmd.Process == nil {
 		return nil
 	}
@@ -64,6 +72,7 @@ func (bp *BotProcess) Stop(timeout time.Duration) error {
 	}
 
 	pid := bp.cmd.Process.Pid
+	lg.Printf("bot stop requested: pid=%d timeout=%s", pid, timeout)
 	if pgid, err := syscall.Getpgid(pid); err == nil {
 		_ = syscall.Kill(-pgid, syscall.SIGTERM)
 	} else {
@@ -84,8 +93,10 @@ func (bp *BotProcess) Stop(timeout time.Duration) error {
 		return fmt.Errorf("bot force-killed (pid=%d)", pid)
 	case err := <-bp.done:
 		if err == nil {
+			lg.Printf("bot stopped gracefully: pid=%d", pid)
 			return nil
 		}
+		lg.Printf("bot stop completed with error (ignored): pid=%d err=%v", pid, err)
 		return nil
 	}
 }

@@ -22,6 +22,10 @@ type App struct {
 	batchState               *batchstate.Store
 	imagePrinter             *labelprint.Service
 	log                      *log.Logger
+	logRun                   *log.Logger
+	logBatch                 *log.Logger
+	logCallback              *log.Logger
+	logCleanup               *log.Logger
 	startInfoMsgByChat       map[int64]int64
 	batchPromptMsgByChat     map[int64]int64
 	warehousePromptMsgByChat map[int64]int64
@@ -51,9 +55,21 @@ type itemChoice struct {
 	ItemName string
 }
 
-func New(cfg config.Config, logger *log.Logger) *App {
+func New(cfg config.Config, logger *log.Logger, runLogger *log.Logger, batchLogger *log.Logger, callbackLogger *log.Logger, cleanupLogger *log.Logger) *App {
 	if logger == nil {
 		logger = log.Default()
+	}
+	if runLogger == nil {
+		runLogger = logger
+	}
+	if batchLogger == nil {
+		batchLogger = logger
+	}
+	if callbackLogger == nil {
+		callbackLogger = logger
+	}
+	if cleanupLogger == nil {
+		cleanupLogger = logger
 	}
 	return &App{
 		cfg:                      cfg,
@@ -63,6 +79,10 @@ func New(cfg config.Config, logger *log.Logger) *App {
 		batchState:               batchstate.New(cfg.BridgeStateFile),
 		imagePrinter:             labelprint.New(cfg.PrinterDevice, cfg.LabelWidthDots, cfg.LabelHeightDots),
 		log:                      logger,
+		logRun:                   runLogger,
+		logBatch:                 batchLogger,
+		logCallback:              callbackLogger,
+		logCleanup:               cleanupLogger,
 		startInfoMsgByChat:       make(map[int64]int64),
 		batchPromptMsgByChat:     make(map[int64]int64),
 		warehousePromptMsgByChat: make(map[int64]int64),

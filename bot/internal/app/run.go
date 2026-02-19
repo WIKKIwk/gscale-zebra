@@ -10,7 +10,7 @@ import (
 
 func (a *App) Run(ctx context.Context) error {
 	a.setBatchState(false, 0, SelectedContext{})
-	a.log.Printf("bot started, ERP=%s bridge_state=%s", a.cfg.ERPURL, a.cfg.BridgeStateFile)
+	a.logRun.Printf("bot started, ERP=%s bridge_state=%s", a.cfg.ERPURL, a.cfg.BridgeStateFile)
 	defer a.stopAllBatchSessions()
 	defer a.setBatchState(false, 0, SelectedContext{})
 	var offset int64
@@ -24,7 +24,7 @@ func (a *App) Run(ctx context.Context) error {
 
 		updates, err := a.tg.GetUpdates(ctx, offset, 55)
 		if err != nil {
-			a.log.Printf("getUpdates error: %v", err)
+			a.logRun.Printf("getUpdates error: %v", err)
 			time.Sleep(1200 * time.Millisecond)
 			continue
 		}
@@ -41,14 +41,14 @@ func (a *App) Run(ctx context.Context) error {
 func (a *App) handleUpdate(ctx context.Context, upd telegram.Update) {
 	if upd.InlineQuery != nil {
 		if err := commands.HandleInlineQuery(ctx, a.deps(), *upd.InlineQuery); err != nil {
-			a.log.Printf("handleInlineQuery error: %v", err)
+			a.logCallback.Printf("handleInlineQuery error: %v", err)
 		}
 		return
 	}
 
 	if upd.CallbackQuery != nil {
 		if err := a.handleCallbackQuery(ctx, *upd.CallbackQuery); err != nil {
-			a.log.Printf("handleCallbackQuery error: %v", err)
+			a.logCallback.Printf("handleCallbackQuery error: %v", err)
 		}
 		return
 	}
@@ -57,6 +57,6 @@ func (a *App) handleUpdate(ctx context.Context, upd telegram.Update) {
 		return
 	}
 	if err := a.handleMessage(ctx, *upd.Message); err != nil {
-		a.log.Printf("handleMessage error: %v", err)
+		a.logCallback.Printf("handleMessage error: %v", err)
 	}
 }

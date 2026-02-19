@@ -15,6 +15,8 @@ func startBridgeReader(ctx context.Context, url string, interval time.Duration, 
 		interval = 100 * time.Millisecond
 	}
 
+	lg := workerLog("worker.bridge")
+	lg.Printf("start: url=%s interval=%s", strings.TrimSpace(url), interval)
 	client := &http.Client{Timeout: 2 * time.Second}
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -29,6 +31,7 @@ func startBridgeReader(ctx context.Context, url string, interval time.Duration, 
 
 			resp, err := client.Get(url)
 			if err != nil {
+				lg.Printf("request error: %v", err)
 				push(out, Reading{
 					Source:    "bridge",
 					Error:     err.Error(),
@@ -40,6 +43,7 @@ func startBridgeReader(ctx context.Context, url string, interval time.Duration, 
 			body, readErr := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 			if readErr != nil {
+				lg.Printf("read body error: %v", readErr)
 				push(out, Reading{
 					Source:    "bridge",
 					Error:     readErr.Error(),
@@ -49,6 +53,7 @@ func startBridgeReader(ctx context.Context, url string, interval time.Duration, 
 			}
 
 			if resp.StatusCode < 200 || resp.StatusCode > 299 {
+				lg.Printf("http error: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
 				push(out, Reading{
 					Source:    "bridge",
 					Error:     fmt.Sprintf("http %d: %s", resp.StatusCode, strings.TrimSpace(string(body))),
@@ -59,6 +64,7 @@ func startBridgeReader(ctx context.Context, url string, interval time.Duration, 
 
 			var payload scaleAPIResponse
 			if err := json.Unmarshal(body, &payload); err != nil {
+				lg.Printf("json decode error: %v body=%s", err, strings.TrimSpace(string(body)))
 				push(out, Reading{
 					Source:    "bridge",
 					Error:     err.Error(),
@@ -77,6 +83,15 @@ func startBridgeReader(ctx context.Context, url string, interval time.Duration, 
 				Error:     payload.Error,
 				UpdatedAt: time.Now(),
 			})
+			stableText := "unknown"
+			if payload.Stable != nil {
+				if *payload.Stable {
+					stableText = "true"
+				} else {
+					stableText = "false"
+				}
+			}
+			lg.Printf("bridge reading: weight=%v unit=%s stable=%s err=%s", payload.Weight, strings.TrimSpace(payload.Unit), stableText, strings.TrimSpace(payload.Error))
 		}
 	}()
 }

@@ -5,7 +5,7 @@ func (a *App) setBatchState(active bool, chatID int64, sel SelectedContext) {
 		return
 	}
 	if err := a.batchState.Set(active, chatID, sel.ItemCode, sel.ItemName, sel.Warehouse); err != nil {
-		a.log.Printf("batch state write error: %v", err)
+		a.logBatch.Printf("batch state write error: %v", err)
 	}
 }
 

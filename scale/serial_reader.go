@@ -10,6 +10,8 @@ import (
 )
 
 func startSerialReader(ctx context.Context, device string, baud int, unit string, out chan<- Reading) error {
+	lg := workerLog("worker.serial")
+	lg.Printf("start: device=%s baud=%d unit=%s", strings.TrimSpace(device), baud, strings.TrimSpace(unit))
 	go func() {
 		for {
 			select {
@@ -20,6 +22,7 @@ func startSerialReader(ctx context.Context, device string, baud int, unit string
 
 			port, err := serial.OpenPort(&serial.Config{Name: device, Baud: baud, ReadTimeout: 250 * time.Millisecond})
 			if err != nil {
+				lg.Printf("open error: %v", err)
 				push(out, Reading{
 					Source:    "serial",
 					Port:      device,
@@ -34,6 +37,7 @@ func startSerialReader(ctx context.Context, device string, baud int, unit string
 				continue
 			}
 
+			lg.Printf("port opened: device=%s baud=%d", device, baud)
 			push(out, Reading{
 				Source:    "serial",
 				Port:      device,
@@ -44,12 +48,14 @@ func startSerialReader(ctx context.Context, device string, baud int, unit string
 
 			err = streamSerial(ctx, port, device, baud, unit, out)
 			_ = port.Close()
+			lg.Printf("port closed: device=%s err=%v", device, err)
 
 			if ctx.Err() != nil {
 				return
 			}
 
 			if err != nil {
+				lg.Printf("stream read error: %v", err)
 				push(out, Reading{
 					Source:    "serial",
 					Port:      device,
@@ -70,6 +76,7 @@ func startSerialReader(ctx context.Context, device string, baud int, unit string
 }
 
 func streamSerial(ctx context.Context, port *serial.Port, device string, baud int, unit string, out chan<- Reading) error {
+	lg := workerLog("worker.serial")
 	buf := make([]byte, 256)
 	pending := ""
 	lastUnit := strings.ToLower(strings.TrimSpace(unit))
@@ -109,6 +116,7 @@ func streamSerial(ctx context.Context, port *serial.Port, device string, baud in
 					continue
 				}
 				zero := 0.0
+				lg.Printf("frame empty -> weight=0")
 				push(out, Reading{
 					Source:    "serial",
 					Port:      device,
@@ -124,6 +132,7 @@ func streamSerial(ctx context.Context, port *serial.Port, device string, baud in
 			weight, parsedUnit, stable, ok := parseWeight(trimmed, unit)
 			if !ok {
 				// Keep stream alive even when a frame cannot be parsed.
+				lg.Printf("frame parse miss: raw=%q", trimmed)
 				push(out, Reading{
 					Source:    "serial",
 					Port:      device,
@@ -140,6 +149,15 @@ func streamSerial(ctx context.Context, port *serial.Port, device string, baud in
 				lastUnit = parsedUnit
 			}
 			seenParsedValue = true
+			stableText := "unknown"
+			if stable != nil {
+				if *stable {
+					stableText = "true"
+				} else {
+					stableText = "false"
+				}
+			}
+			lg.Printf("frame parsed: weight=%.3f unit=%s stable=%s raw=%q", w, lastUnit, stableText, trimmed)
 			push(out, Reading{
 				Source:    "serial",
 				Port:      device,

@@ -12,18 +12,25 @@ func startZebraMonitor(ctx context.Context, preferredDevice string, interval tim
 	if interval < 300*time.Millisecond {
 		interval = 300 * time.Millisecond
 	}
+	lg := workerLog("worker.zebra_monitor")
+	lg.Printf("start: preferred_device=%s interval=%s", preferredDevice, interval)
 
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		publishZebraStatus(out, collectZebraStatus(preferredDevice, 900*time.Millisecond))
+		st := collectZebraStatus(preferredDevice, 900*time.Millisecond)
+		publishZebraStatus(out, st)
+		lg.Printf("status: connected=%v device=%s verify=%s error=%s", st.Connected, st.DevicePath, st.Verify, st.Error)
 		for {
 			select {
 			case <-ctx.Done():
+				lg.Printf("stop: context done")
 				return
 			case <-ticker.C:
-				publishZebraStatus(out, collectZebraStatus(preferredDevice, 900*time.Millisecond))
+				st := collectZebraStatus(preferredDevice, 900*time.Millisecond)
+				publishZebraStatus(out, st)
+				lg.Printf("status: connected=%v device=%s verify=%s error=%s", st.Connected, st.DevicePath, st.Verify, st.Error)
 			}
 		}
 	}()

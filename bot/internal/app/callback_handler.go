@@ -63,7 +63,7 @@ func (a *App) handleBatchChangeItemCallback(ctx context.Context, q telegram.Call
 
 	pausedText := formatPausedStatus(q.Message.Text)
 	if err := a.tg.EditMessageText(ctx, chatID, q.Message.MessageID, pausedText, commands.BuildBatchControlKeyboard()); err != nil && !isMessageNotModifiedError(err) {
-		a.log.Printf("edit paused status warning: %v", err)
+		a.logCallback.Printf("edit paused status warning: %v", err)
 	}
 
 	promptID, err := commands.HandleBatch(ctx, a.deps(), telegram.Message{Chat: telegram.Chat{ID: chatID}})
@@ -93,7 +93,7 @@ func (a *App) handleBatchStopCallback(ctx context.Context, q telegram.CallbackQu
 		}
 		stoppedText := formatStoppedStatus(q.Message.Text)
 		if err := a.tg.EditMessageText(ctx, chatID, q.Message.MessageID, stoppedText, commands.BuildBatchControlKeyboard()); err != nil && !isMessageNotModifiedError(err) {
-			a.log.Printf("edit stopped status warning: %v", err)
+			a.logCallback.Printf("edit stopped status warning: %v", err)
 		}
 		return nil
 	}
@@ -149,7 +149,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", "", "", "Scale xato: "+err.Error()))
 			continue
 		}
-		a.log.Printf(
+		a.logBatch.Printf(
 			"batch stable qty: chat=%d item=%s warehouse=%s qty=%.3f unit=%s scale_at=%s",
 			chatID,
 			strings.TrimSpace(sel.ItemCode),
@@ -174,7 +174,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			if epcVerify == "" {
 				epcVerify = "UNKNOWN"
 			}
-			a.log.Printf(
+			a.logBatch.Printf(
 				"batch epc matched: chat=%d qty=%.3f epc=%s verify=%s zebra_at=%s",
 				chatID,
 				reading.Qty,
@@ -188,7 +188,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 				epcNote,
 				"RFID verify muvaffaqiyatsiz (VERIFY=" + epcVerify + ")",
 			}, " | "))
-			a.log.Printf(
+			a.logBatch.Printf(
 				"batch epc rejected (verify failed): chat=%d qty=%.3f epc=%s verify=%s",
 				chatID,
 				reading.Qty,
@@ -198,7 +198,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			epc = ""
 		}
 		if strings.TrimSpace(epc) == "" {
-			a.log.Printf(
+			a.logBatch.Printf(
 				"batch epc missing: chat=%d qty=%.3f reason=%s",
 				chatID,
 				reading.Qty,
@@ -224,11 +224,11 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			Barcode:   epc,
 		})
 		if err != nil {
-			a.log.Printf("batch draft create error: chat=%d qty=%.3f epc=%s err=%v", chatID, reading.Qty, epc, err)
+			a.logBatch.Printf("batch draft create error: chat=%d qty=%.3f epc=%s err=%v", chatID, reading.Qty, epc, err)
 			statusMessageID = a.upsertBatchStatusMessage(ctx, chatID, statusMessageID, formatBatchStatusText(sel, draftCount, "", 0, "", epc, epcVerify, "ERP xato: "+err.Error()))
 			continue
 		}
-		a.log.Printf("batch draft created: chat=%d draft=%s qty=%.3f epc=%s", chatID, strings.TrimSpace(draft.Name), draft.Qty, epc)
+		a.logBatch.Printf("batch draft created: chat=%d draft=%s qty=%.3f epc=%s", chatID, strings.TrimSpace(draft.Name), draft.Qty, epc)
 
 		draftCount++
 		if epc != "" {
@@ -260,12 +260,12 @@ func (a *App) upsertBatchStatusMessage(ctx context.Context, chatID, messageID in
 		if err == nil || isMessageNotModifiedError(err) {
 			return messageID
 		}
-		a.log.Printf("edit batch status warning: %v", err)
+		a.logCallback.Printf("edit batch status warning: %v", err)
 	}
 
 	newID, err := a.tg.SendMessageWithInlineKeyboardAndReturnID(ctx, chatID, text, commands.BuildBatchControlKeyboard())
 	if err != nil {
-		a.log.Printf("send batch status warning: %v", err)
+		a.logCallback.Printf("send batch status warning: %v", err)
 		return messageID
 	}
 	return newID

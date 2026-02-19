@@ -64,6 +64,6 @@ func (a *App) deleteMessageBestEffort(ctx context.Context, chatID, messageID int
 		return
 	}
 	if err := a.tg.DeleteMessage(ctx, chatID, messageID); err != nil {
-		a.log.Printf("%s: %v", logPrefix, err)
+		a.logCleanup.Printf("%s: %v", logPrefix, err)
 	}
 }

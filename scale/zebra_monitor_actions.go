@@ -7,6 +7,8 @@ import (
 )
 
 func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
+	lg := workerLog("worker.zebra_action")
+	lg.Printf("read start: preferred_device=%s timeout=%s", preferredDevice, timeout)
 	zebraIOMutex.Lock()
 	defer zebraIOMutex.Unlock()
 
@@ -20,6 +22,7 @@ func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
 	p, err := SelectZebraPrinter(preferredDevice)
 	if err != nil {
 		st.Error = err.Error()
+		lg.Printf("read printer select error: %v", err)
 		return st
 	}
 	st.Connected = true
@@ -32,10 +35,13 @@ func runZebraRead(preferredDevice string, timeout time.Duration) ZebraStatus {
 	st.Verify = verify
 	st.DeviceState = safeText("-", queryVarRetry(p.DevicePath, "device.status", timeout, 3, 90*time.Millisecond))
 	st.MediaState = safeText("-", queryVarRetry(p.DevicePath, "media.status", timeout, 3, 90*time.Millisecond))
+	lg.Printf("read done: device=%s verify=%s line1=%s line2=%s error=%s", st.DevicePath, st.Verify, st.ReadLine1, st.ReadLine2, st.Error)
 	return st
 }
 
 func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeout time.Duration) ZebraStatus {
+	lg := workerLog("worker.zebra_action")
+	lg.Printf("encode start: preferred_device=%s epc=%s qty=%s item=%s timeout=%s", preferredDevice, strings.TrimSpace(epc), strings.TrimSpace(qtyText), strings.TrimSpace(itemName), timeout)
 	zebraIOMutex.Lock()
 	defer zebraIOMutex.Unlock()
 
@@ -49,6 +55,7 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	norm, err := normalizeEPC(epc)
 	if err != nil {
 		st.Error = err.Error()
+		lg.Printf("encode epc normalize error: %v", err)
 		return st
 	}
 	attemptedEPC := norm
@@ -56,6 +63,7 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	p, err := SelectZebraPrinter(preferredDevice)
 	if err != nil {
 		st.Error = err.Error()
+		lg.Printf("encode printer select error: %v", err)
 		return st
 	}
 	st.Connected = true
@@ -65,6 +73,7 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	line1, line2, verify, attempts, autoTuned, err := encodeAndVerify(p.DevicePath, norm, qtyText, itemName, timeout)
 	if err != nil {
 		st.Error = err.Error()
+		lg.Printf("encode attempt error: device=%s err=%v", p.DevicePath, err)
 		applyZebraSnapshot(&st, p, timeout)
 		return st
 	}
@@ -84,6 +93,7 @@ func runZebraEncodeAndRead(preferredDevice, epc, qtyText, itemName string, timeo
 	if !isVerifySuccess(st.Verify) && strings.TrimSpace(st.Error) == "" {
 		st.Note = strings.TrimSpace(strings.Join([]string{st.Note, "verify=" + st.Verify, "epc_attempt=" + attemptedEPC}, " "))
 	}
+	lg.Printf("encode done: device=%s verify=%s last_epc=%s line1=%s line2=%s attempts=%d autotuned=%v note=%s error=%s", st.DevicePath, st.Verify, st.LastEPC, st.ReadLine1, st.ReadLine2, st.Attempts, st.AutoTuned, st.Note, st.Error)
 	return st
 }
 
