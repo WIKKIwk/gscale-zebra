@@ -17,6 +17,7 @@ go run ./cmd/bot
 - `/batch` - batch oqimini boshlash uchun item/ombor tanlash jarayonini ochadi.
 - `/log` - `logs/bot` va `logs/scale` fayllarini Telegram chatga yuboradi.
 - `/epc` - bot ishga tushganidan beri draftlarda ishlatilgan EPC ro'yxatini `.txt` fayl qilib yuboradi.
+- `/calibrate` - Zebra calibration yuboradi (`~JC` va default holatda save). Format: `/calibrate [--device /dev/usb/lp0] [--no-save] [--dry-run]`
 
 ## Batch workflow (hozirgi amaliy oqim) ✅
 
