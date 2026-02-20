@@ -290,6 +290,7 @@ func (a *App) runMaterialIssueBatchLoop(ctx context.Context, chatID int64, sel S
 			continue
 		}
 		a.logBatch.Printf("batch draft created: chat=%d draft=%s qty=%.3f epc=%s", chatID, strings.TrimSpace(draft.Name), draft.Qty, epc)
+		a.epcHistory.Add(epc)
 
 		draftCount++
 		if epc != "" {

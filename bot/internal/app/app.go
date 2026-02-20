@@ -19,6 +19,7 @@ type App struct {
 	erp                      *erp.Client
 	qtyReader                *bridgeclient.Client
 	batchState               *batchstate.Store
+	epcHistory               *EPCHistory
 	log                      *log.Logger
 	logRun                   *log.Logger
 	logBatch                 *log.Logger
@@ -74,6 +75,7 @@ func New(cfg config.Config, logger *log.Logger, runLogger *log.Logger, batchLogg
 		erp:                      erp.New(cfg.ERPURL, cfg.ERPAPIKey, cfg.ERPAPISecret),
 		qtyReader:                bridgeclient.New(cfg.BridgeStateFile),
 		batchState:               batchstate.New(cfg.BridgeStateFile),
+		epcHistory:               NewEPCHistory(),
 		log:                      logger,
 		logRun:                   runLogger,
 		logBatch:                 batchLogger,

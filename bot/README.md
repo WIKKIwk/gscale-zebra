@@ -16,6 +16,7 @@ go run ./cmd/bot
 - `/start` - ERPNext ulanishini tekshiradi va botni tayyor holatga olib keladi.
 - `/batch` - batch oqimini boshlash uchun item/ombor tanlash jarayonini ochadi.
 - `/log` - `logs/bot` va `logs/scale` fayllarini Telegram chatga yuboradi.
+- `/epc` - bot ishga tushganidan beri draftlarda ishlatilgan EPC ro'yxatini `.txt` fayl qilib yuboradi.
 
 ## Batch workflow (hozirgi amaliy oqim) ✅
 

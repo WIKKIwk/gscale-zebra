@@ -75,8 +75,10 @@ func (a *App) handleMessage(ctx context.Context, msg telegram.Message) error {
 		return nil
 	case "/log":
 		return a.handleLogCommand(ctx, msg.Chat.ID)
+	case "/epc":
+		return a.handleEPCCommand(ctx, msg.Chat.ID)
 	default:
-		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch, /log")
+		return a.tg.SendMessage(ctx, msg.Chat.ID, "Qo'llanadigan buyruqlar: /start, /batch, /log, /epc")
 	}
 }
 
@@ -93,7 +95,7 @@ func (a *App) maybeDeleteCommandMessage(ctx context.Context, msg telegram.Messag
 
 func shouldDeleteUserCommand(cmd string) bool {
 	switch cmd {
-	case "/start", "/batch", "/log":
+	case "/start", "/batch", "/log", "/epc":
 		return true
 	default:
 		return false
